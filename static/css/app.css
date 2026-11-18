@@ -324,6 +324,39 @@ a { color: var(--accent-soft); }
   justify-content: center;
 }
 .topbar-btn.muted-sound { color: var(--text-muted); }
+
+/* Ping indicator pill on topbar */
+.ping-pill {
+  gap: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 0 9px;
+}
+.ping-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 12px;
+}
+.ping-bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: var(--border);
+  transition: background 0.18s;
+}
+.ping-bars i:nth-child(1) { height: 4px; }
+.ping-bars i:nth-child(2) { height: 6.5px; }
+.ping-bars i:nth-child(3) { height: 9px; }
+.ping-bars i:nth-child(4) { height: 12px; }
+.ping-pill.good .ping-bars i { background: var(--ok); }
+.ping-pill.good .ping-ms { color: var(--ok); }
+.ping-pill.ok .ping-bars i:nth-child(-n+3) { background: var(--warn); }
+.ping-pill.ok .ping-ms { color: var(--warn); }
+.ping-pill.bad .ping-bars i:nth-child(1) { background: var(--danger); }
+.ping-pill.bad .ping-ms { color: var(--danger); }
+.ping-pill.off .ping-ms { color: var(--text-muted); }
+
 .theme-trigger.open {
   border-color: var(--accent-soft);
   background: var(--accent-dim);
