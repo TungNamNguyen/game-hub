@@ -17,7 +17,7 @@ ANSWER_MODES = ("choice", "typing")
 ALLOWED_QUESTION_COUNTS = (10, 15, 20)
 ALLOWED_ROUND_TIMES = (10, 15, 20, 30)
 REVEAL_SECONDS = 3.2
-GRACE_SECONDS = 0.4
+GRACE_SECONDS = 0.15
 
 
 def _load_countries() -> list[dict]:
@@ -546,12 +546,17 @@ class FlagsRoom(SeatedRoom):
                 if self.q_idx + 1 < len(self.questions)
                 else ""
             )
+            preload_urls = [
+                flag_svg_url(self.questions[i]["country"]["code"])
+                for i in range(self.q_idx + 1, min(len(self.questions), self.q_idx + 4))
+            ]
             q_payload = {
                 "index": self.q_idx + 1,
                 "total": len(self.questions),
                 "kind": q["kind"],
                 "flagUrl": flag_svg_url(c["code"]),
                 "nextFlagUrl": flag_svg_url(next_c) if next_c else "",
+                "preloadFlags": preload_urls,
                 "promptCountryVi": c["nameVi"] if q["kind"] == "capital" else "",
                 "promptCountryEn": c["nameEn"] if q["kind"] == "capital" else "",
                 "continent": c["continent"],
