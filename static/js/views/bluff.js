@@ -463,9 +463,18 @@ function mountRoom(root, ctx, code) {
     if (myTurn && !s.forcedLiar) {
       handBar.appendChild(h('button', {
         class: 'primary bluff-place' + (devilPicked ? ' devil' : ''), disabled: !count,
-        onclick: () => {
-          net.send(CHANNEL, 'play', { cards: [...picked] });
+        onclick: (ev) => {
+          const cardsToPlay = [...picked];
           picked = new Set();
+          ev.currentTarget.disabled = true;
+          sfx.move();
+          if (state && Array.isArray(state.hand)) {
+            state.hand = state.hand.filter((c) => !cardsToPlay.includes(c.id));
+            state.turn = '';
+            renderHand(state);
+            renderHandBar(state);
+          }
+          net.send(CHANNEL, 'play', { cards: cardsToPlay });
         },
       }, count
         // Lời khai KHÔNG đổi khi đặt Ma Vương: vẫn úp xuống và khai là quân chủ,
@@ -482,8 +491,10 @@ function mountRoom(root, ctx, code) {
     if (canCall) {
       handBar.appendChild(h('button', {
         class: 'danger bluff-call' + (s.forcedLiar ? ' pulse' : ''),
-        onclick: () => {
+        onclick: (ev) => {
           picked = new Set();
+          ev.currentTarget.disabled = true;
+          sfx.move();
           net.send(CHANNEL, 'liar');
         },
       }, t('bluff.callLiarBtn')));
