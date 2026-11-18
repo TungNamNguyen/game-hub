@@ -51,6 +51,20 @@ export default {
     let serverSkewMs = 0;
     let lastRenderKey = '';
     let lastClockKey = '';
+    let pendingChoice = '';
+    let pendingQuestionIdx = -1;
+    let activeChoiceButtons = [];
+    let wrongBannerSlot = null;
+    let optimisticPlayed = false;
+    const preloadedUrls = new Set();
+
+    function preloadFlag(url) {
+      if (!url || preloadedUrls.has(url)) return;
+      preloadedUrls.add(url);
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+    }
 
     loadCountriesIndex().then((list) => { countriesIndex = list; });
 
@@ -165,13 +179,25 @@ export default {
     }
 
     let activeTypeInput = null;
+
+    function submitChoiceOptimistic(code) {
+      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice) return;
+      pendingChoice = code;
+      pendingQuestionIdx = state.question?.index ?? -1;
+      optimisticPlayed = true;
+      sfx.move();
+      for (const entry of activeChoiceButtons) {
+        entry.btn.disabled = true;
+        entry.btn.classList.toggle('pending', entry.code === code);
+      }
+      send('answer', { choice: code });
+    }
+
     function renderQuestion() {
       const q = state.question;
       if (!q) return;
-      if (q.nextFlagUrl) {
-        const pre = new Image();
-        pre.src = q.nextFlagUrl;
-      }
+      if (q.nextFlagUrl) preloadFlag(q.nextFlagUrl);
+      if (Array.isArray(q.preloadFlags)) q.preloadFlags.forEach(preloadFlag);
 
       const cfg = state.config || {};
       const myAns = state.myAnswer;
@@ -186,6 +212,10 @@ export default {
             country: getLang() === 'en' ? q.promptCountryEn : q.promptCountryVi,
           });
 
+      activeChoiceButtons = [];
+      activeTypeInput = null;
+      wrongBannerSlot = null;
+
       const stageBody = h('div', { class: 'flags-prompt-card card col' },
         h('div', { class: 'spread' },
           h('span', { class: 'chip accent' }, t('flags.qProgress', { i: q.index, total: q.total })),
@@ -199,6 +229,7 @@ export default {
               src: q.flagUrl,
               alt: 'Flag',
               loading: 'eager',
+              decoding: 'async',
             })),
           !isFlag ? h('div', { class: 'flags-country-banner' },
             getLang() === 'en' ? q.promptCountryEn : q.promptCountryVi) : null,
@@ -213,17 +244,24 @@ export default {
             ? t('flags.lockedSkip')
             : t('flags.lockedWrong')));
       } else if ((cfg.answerMode || 'choice') === 'choice') {
+        const isPendingHere = pendingChoice && pendingQuestionIdx === q.index;
         const grid = h('div', { class: 'flags-options-grid' },
-          (q.options || []).map((opt, idx) => h('button', {
-            type: 'button',
-            class: 'flags-opt-btn',
-            onclick: () => send('answer', { choice: opt.code }),
-          },
-            h('span', { class: 'flags-opt-key' }, String(idx + 1)),
-            h('span', { class: 'flags-opt-label' }, primaryLabel(opt)))));
+          (q.options || []).map((opt, idx) => {
+            const btn = h('button', {
+              type: 'button',
+              class: 'flags-opt-btn' + (isPendingHere && pendingChoice === opt.code ? ' pending' : ''),
+              disabled: Boolean(isPendingHere),
+              onclick: () => submitChoiceOptimistic(opt.code),
+            },
+              h('span', { class: 'flags-opt-key' }, String(idx + 1)),
+              h('span', { class: 'flags-opt-label' }, primaryLabel(opt)));
+            activeChoiceButtons.push({ code: opt.code, btn });
+            return btn;
+          }));
         stageBody.append(grid, h('div', { class: 'tiny muted', style: { textAlign: 'center' } }, t('flags.hotkeyHint')));
       } else {
         const sugBox = h('div', { class: 'flags-suggestions' });
+        wrongBannerSlot = h('div', {});
         const input = h('input', {
           class: 'flags-type-input',
           type: 'text',
@@ -233,7 +271,10 @@ export default {
             if (event.key === 'Enter') {
               event.preventDefault();
               const val = input.value.trim();
-              if (val) send('answer', { text: val });
+              if (val) {
+                sfx.move();
+                send('answer', { text: val });
+              }
             }
           },
         });
@@ -266,15 +307,18 @@ export default {
             sugBox.appendChild(h('button', {
               type: 'button',
               class: 'xs ghost flags-sug-pill',
-              onclick: () => send('answer', { text: label }),
+              onclick: () => {
+                sfx.move();
+                send('answer', { text: label });
+              },
             }, label));
           }
         };
         input.addEventListener('input', updateSuggestions);
 
-        const lastWrong = myWrongs.length ? myWrongs[myWrongs.length - 1] : '';
+        syncTypingWrongBanner(myWrongs);
         stageBody.append(
-          lastWrong ? h('div', { class: 'banner danger' }, t('flags.wrongRetry', { text: lastWrong })) : null,
+          wrongBannerSlot,
           h('div', { class: 'row' },
             input,
             h('button', {
@@ -282,7 +326,10 @@ export default {
               class: 'primary',
               onclick: () => {
                 const val = input.value.trim();
-                if (val) send('answer', { text: val });
+                if (val) {
+                  sfx.move();
+                  send('answer', { text: val });
+                }
               },
             }, t('flags.submitBtn')),
             h('button', {
@@ -296,6 +343,16 @@ export default {
       mount(mainCol, stageBody);
       if (activeTypeInput && !myAns) {
         requestAnimationFrame(() => activeTypeInput?.focus());
+      }
+    }
+
+    function syncTypingWrongBanner(wrongs) {
+      if (!wrongBannerSlot) return;
+      const lastWrong = wrongs && wrongs.length ? wrongs[wrongs.length - 1] : '';
+      if (lastWrong) {
+        mount(wrongBannerSlot, h('div', { class: 'banner danger' }, t('flags.wrongRetry', { text: lastWrong })));
+      } else {
+        clear(wrongBannerSlot);
       }
     }
 
@@ -419,8 +476,8 @@ export default {
         mode: state.mode,
         cfg: state.config,
         idx: state.question?.index,
-        myAns: state.myAnswer,
-        wrongs: state.myWrongTries?.length,
+        myAns: Boolean(state.myAnswer),
+        myAnsOk: state.myAnswer?.correct,
         seated: state.you?.mark,
         rematch: state.rematch,
       });
@@ -430,18 +487,20 @@ export default {
         else if (state.phase === 'question') renderQuestion();
         else if (state.phase === 'reveal') renderReveal();
         else if (state.phase === 'finished') renderFinished();
+      } else if (state.phase === 'question' && !state.myAnswer && (state.config?.answerMode || 'choice') === 'typing') {
+        syncTypingWrongBanner(state.myWrongTries || []);
       }
     }
 
     const onKeyDown = (event) => {
-      if (!state || state.phase !== 'question' || state.myAnswer) return;
+      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice) return;
       const tag = (event.target?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea') return;
       if ((state.config?.answerMode || 'choice') !== 'choice') return;
       const idx = ['1', '2', '3', '4'].indexOf(event.key);
       if (idx >= 0 && state.question?.options?.[idx]) {
         event.preventDefault();
-        send('answer', { choice: state.question.options[idx].code });
+        submitChoiceOptimistic(state.question.options[idx].code);
       }
     };
     document.addEventListener('keydown', onKeyDown);
@@ -449,18 +508,33 @@ export default {
     const stopNet = net.on(CHANNEL, (msg) => {
       if (msg.t === 'state') {
         const prevPhase = state?.phase;
+        const prevIdx = state?.question?.index;
         const prevAns = state?.myAnswer;
         state = msg;
+        if (msg.phase !== 'question' || msg.question?.index !== prevIdx || msg.myAnswer) {
+          pendingChoice = '';
+          pendingQuestionIdx = -1;
+        }
         if (typeof msg.now === 'number') {
           serverSkewMs = msg.now * 1000 - Date.now();
         }
         if (prevPhase !== 'reveal' && msg.phase === 'reveal') {
-          (msg.myAnswer?.correct ? sfx.win : sfx.move)();
+          if (msg.myAnswer?.correct) sfx.win();
+          else if (!optimisticPlayed) sfx.move();
+          optimisticPlayed = false;
         } else if (!prevAns && msg.myAnswer?.correct) {
           sfx.win();
+          optimisticPlayed = false;
         }
         renderState();
       } else if (msg.t === 'error') {
+        pendingChoice = '';
+        pendingQuestionIdx = -1;
+        optimisticPlayed = false;
+        for (const entry of activeChoiceButtons) {
+          entry.btn.disabled = false;
+          entry.btn.classList.remove('pending');
+        }
         toast(msg.message, 'danger');
       } else if (msg.t === 'closed') {
         toast(msg.message || t('shell.roomClosed'), 'danger');
@@ -469,10 +543,13 @@ export default {
     });
 
     const timer = setInterval(updateTimer, 200);
-    send('join', { room: roomCode });
+    const join = () => send('join', { room: roomCode });
+    const stopRejoin = net.onRejoin(join);
+    join();
 
     return () => {
       stopNet();
+      stopRejoin();
       clearInterval(timer);
       document.removeEventListener('keydown', onKeyDown);
       send('leave');
