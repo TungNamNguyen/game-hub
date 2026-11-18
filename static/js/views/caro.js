@@ -33,6 +33,7 @@ function mountRoom(root, ctx, code) {
   let prevMoves = -1;
   let prevStatus = '';
   let prevLastMove = -1;
+  let pendingMove = false;
 
   const board = h('div', { class: 'caro-board', role: 'grid', 'aria-label': t('caro.boardAria') });
   const boardWrap = h('div', { class: 'board-wrap' }, board);
@@ -138,10 +139,21 @@ function mountRoom(root, ctx, code) {
 
   board.onclick = (event) => {
     const cell = event.target.closest('.caro-cell');
-    if (!cell || !state) return;
+    if (!cell || !state || pendingMove) return;
     const index = Number(cell.dataset.index);
     if (state.board[index]) return;
     if (state.status !== 'playing' || state.turn !== state.you.mark) return;
+    // Optimistic UI: vẽ ngay nước đi của mình trong 0ms không chờ mạng khứ hồi
+    pendingMove = true;
+    const mine = state.you.mark;
+    state.board[index] = mine;
+    state.lastMove = index;
+    state.moveCount = (state.moveCount || 0) + 1;
+    state.turn = mine === 'X' ? 'O' : 'X';
+    prevMoves = state.moveCount;
+    prevLastMove = index;
+    sfx.move();
+    render();
     net.send(CHANNEL, 'move', { index });
   };
 
@@ -247,9 +259,14 @@ function mountRoom(root, ctx, code) {
 
   /* --------------------------------------------------------------- mạng -- */
   const stop = net.on(CHANNEL, (msg) => {
-    if (msg.t === 'state') { state = msg; render(); }
-    else if (msg.t === 'error') toast(msg.message, 'danger');
-    else if (msg.t === 'closed') {
+    if (msg.t === 'state') {
+      pendingMove = false;
+      state = msg;
+      render();
+    } else if (msg.t === 'error') {
+      pendingMove = false;
+      toast(msg.message, 'danger');
+    } else if (msg.t === 'closed') {
       toast(msg.message || t('shell.roomClosed'), 'danger');
       ctx.navigate(CHANNEL);
     }
