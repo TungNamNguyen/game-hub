@@ -35,6 +35,8 @@ function mountRoom(root, ctx, code) {
   let prevStatus = '';
   let prevShots = -1;
   let prevEnemyHits = -1;
+  let pendingShotIdx = -1;
+  let ownCellNodes = [];
 
   const statusBar = h('div', { class: 'status-bar', role: 'status', 'aria-live': 'polite' },
     t('shell.connecting'));
@@ -59,7 +61,7 @@ function mountRoom(root, ctx, code) {
   mount(root, layoutEl);
 
   /* ----------------------------------------------------- dựng lưới 10x10 -- */
-  function grid({ size, cellClass, onCell, onHover, mode }) {
+  function grid({ size, cellClass, onCell, onHover, mode, outCells }) {
     const box = h('div', {
       class: 'ship-grid' + (mode ? ' ' + mode : ''),
       style: { '--n': size },
@@ -74,20 +76,25 @@ function mountRoom(root, ctx, code) {
       box.appendChild(h('div', { class: 'ship-axis' }, String(r + 1)));
       for (let c = 0; c < size; c++) {
         const index = r * size + c;
-        box.appendChild(h('button', {
+        const btn = h('button', {
           type: 'button',
           class: 'ship-cell ' + cellClass(index),
           'aria-label': `${LETTERS[c]}${r + 1}`,
           onclick: onCell ? () => onCell(index) : null,
           onmouseenter: onHover ? () => onHover(index) : null,
           onfocus: onHover ? () => onHover(index) : null,
-        }, cellText(index)));
+        }, cellText(index));
+        if (outCells) outCells[index] = btn;
+        box.appendChild(btn);
       }
     }
     return box;
 
     function cellText(index) {
-      return (cellClass(index).includes('miss')) ? '•' : '';
+      const cls = cellClass(index);
+      if (cls.includes('miss')) return '•';
+      if (cls.includes('pending')) return '◎';
+      return '';
     }
   }
 
@@ -161,27 +168,43 @@ function mountRoom(root, ctx, code) {
 
     const onCell = placing ? (index) => {
       const ship = shipCell.get(index);
-      if (ship) { net.send(CHANNEL, 'remove', { ship: keyOf(ship) }); return; }
+      if (ship) { sfx.move(); net.send(CHANNEL, 'remove', { ship: keyOf(ship) }); return; }
       if (selected === null) { toast(t('ship.selectShipFirst')); return; }
       const row = Math.floor(index / size), col = index % size;
+      sfx.move();
       net.send(CHANNEL, 'place', { ship: selected, row, col, horizontal });
     } : null;
+
+    // Cập nhật class preview trực tiếp trên 100 ô thay vì dựng lại cả bảng 121 node mỗi lần rê chuột
+    const updateHoverInPlace = () => {
+      if (!ownCellNodes.length) return;
+      const pv = placing ? previewCells() : NO_PREVIEW;
+      const pvSet = new Set(pv.cells);
+      const badPv = pv.bad || pv.cells.some((c) => blocked.has(c));
+      for (let i = 0; i < ownCellNodes.length; i++) {
+        const el = ownCellNodes[i];
+        if (!el) continue;
+        el.classList.toggle('preview-ok', pvSet.has(i) && !badPv);
+        el.classList.toggle('preview-bad', pvSet.has(i) && badPv);
+      }
+    };
 
     const onHover = placing ? (index) => {
       if (hover === index) return;
       hover = index;
-      renderOwnBoard();
+      updateHoverInPlace();
     } : null;
 
     const hitsTaken = (own.ships || []).reduce((sum, sh) => sum + (sh.hits || []).length, 0);
     const total = s.totalShipCells;
+    ownCellNodes = new Array(size * size);
 
     mount(ownBox,
       h('div', { class: 'ship-board-title' },
         h('span', {}, s.you.mark ? t('ship.yourFleet') : t('ship.player1Board')),
         h('span', { class: 'grow' }),
         h('span', { class: 'tiny muted' }, t('ship.hitsTaken', { hits: hitsTaken, total }))),
-      grid({ size, cellClass, onCell, onHover, mode: placing ? 'placing' : '' }),
+      grid({ size, cellClass, onCell, onHover, mode: placing ? 'placing' : '', outCells: ownCellNodes }),
       h('div', { class: 'progress' },
         h('span', { style: { width: `${Math.round(hitsTaken / total * 100)}%` } })));
   }
@@ -207,15 +230,20 @@ function mountRoom(root, ctx, code) {
       const shot = foe.shots ? foe.shots[String(index)] : null;
       if (shot === 'hit') classes.push('hit');
       else if (shot === 'miss') classes.push('miss');
+      else if (index === pendingShotIdx) classes.push('pending', 'lastshot');
       else if (revealed.has(index)) classes.push('reveal');   // chỉ khi ván đã xong
-      else if (myTurn) classes.push('open');
+      else if (myTurn && pendingShotIdx < 0) classes.push('open');
       if (sunkCell.has(index)) classes.push('sunk');
       if (index === s.lastShot && s.lastResult && s.turn !== s.you.mark) classes.push('lastshot');
       return classes.filter(Boolean).join(' ');
     };
 
     const onCell = myTurn ? (index) => {
+      if (pendingShotIdx >= 0) return;
       if (foe.shots && foe.shots[String(index)]) return;
+      pendingShotIdx = index;
+      sfx.move();
+      renderFoeBoard();
       net.send(CHANNEL, 'fire', { index });
     } : null;
 
@@ -410,6 +438,7 @@ function mountRoom(root, ctx, code) {
   /* --------------------------------------------------------------- mạng -- */
   const stop = net.on(CHANNEL, (msg) => {
     if (msg.t === 'state') {
+      pendingShotIdx = -1;
       // Tàu vừa xếp xong thì bỏ chọn để không xếp trùng.
       if (state && msg.own && (msg.own.ships || []).length > (state.own?.ships || []).length) {
         selected = null;
@@ -417,7 +446,9 @@ function mountRoom(root, ctx, code) {
       state = msg;
       render();
     } else if (msg.t === 'error') {
+      pendingShotIdx = -1;
       toast(msg.message, 'danger');
+      if (state) renderFoeBoard();
     } else if (msg.t === 'closed') {
       toast(msg.message || t('shell.roomClosed'), 'danger');
       ctx.navigate(CHANNEL);
