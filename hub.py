@@ -31,16 +31,16 @@ from chessgame import ChessRoom
 from flags_quiz import FlagsRoom
 from games import GameError, RoomManager, clean_name
 from geoguessr import GeoRoom
+from ludo import LudoRoom
 from poker import PokerRoom
 from poker_board import PokerBoard
 from xiangqi import XiangqiRoom
 
-GAME_CHANNELS = ("caro", "ship", "chess", "xiangqi", "bluff", "poker", "geo", "flags")
+GAME_CHANNELS = ("caro", "ship", "chess", "xiangqi", "bluff", "poker", "geo", "flags", "ludo")
 
-# Nhịp gọi ``room.tick()`` cho những phòng có đồng hồ riêng (Sòng Bịp: đếm lùi
-# 30 giây mỗi lượt, và chuỗi pha lật quân -> xoay ổ đạn -> nổ súng). 0.35s đủ mịn
-# để animation không bị lệch mà vẫn gần như không tốn gì.
-TICK_EVERY = 0.35
+# Nhịp gọi ``room.tick()`` cho những phòng có đồng hồ riêng (Sòng Bịp, Địa Đồ,
+# Đố Cờ, Cờ Cá Ngựa). 0.2s giúp chuyển pha mượt mà mà vẫn nhẹ event loop.
+TICK_EVERY = 0.2
 
 # Tối đa bao nhiêu lượt máy đi liên tiếp trong một vòng lặp. Bắn tàu cho bắn
 # tiếp khi trúng, và một vòng Sòng Bịp có thể có tới 20 lượt đặt quân trước khi
@@ -70,6 +70,8 @@ APPS = [
      "desc": "Đoán tọa độ thế giới & Việt Nam 1-6 người"},
     {"id": "flags", "name": "Đố Cờ & Thủ Đô",
      "desc": "Đoán tên nước từ quốc kỳ & thủ đô của 197 quốc gia"},
+    {"id": "ludo", "name": "Cờ Cá Ngựa",
+     "desc": "Đua ngựa 4 người, cản đường, Đá Hậu và leo chuồng 1–6"},
     {"id": "faces", "name": "Tạo avatar",
      "desc": "Bấm một nút ra một mặt người mới, dùng làm ảnh đại diện"},
 ]
@@ -179,6 +181,7 @@ class Hub:
             "poker": RoomManager(PokerRoom),
             "geo": RoomManager(GeoRoom),
             "flags": RoomManager(FlagsRoom),
+            "ludo": RoomManager(LudoRoom),
         }
         self.chat = ChatStore(data_dir)
         self.avatars = AvatarStore(data_dir)
@@ -220,11 +223,14 @@ class Hub:
         await self.send(session, {"ch": channel, "t": "error", "message": message})
 
     async def fan_out(self, sessions, payload_for) -> None:
-        """Gửi cho nhiều người, mỗi người một payload riêng nếu cần."""
+        """Gửi song song cho nhiều người để tránh socket chậm làm nghẽn người khác."""
+        tasks = []
         for session in list(sessions):
             payload = payload_for(session)
             if payload is not None:
-                await self.send(session, payload)
+                tasks.append(self.send(session, payload))
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     # ---- danh tính, presence ----------------------------------------------- #
     def presence(self) -> list[dict]:
@@ -616,7 +622,10 @@ class Hub:
 
         if channel == "hub":
             if kind == "ping":
-                await self.send(session, {"ch": "hub", "t": "pong"})
+                pong = {"ch": "hub", "t": "pong"}
+                if "ts" in msg:
+                    pong["ts"] = msg["ts"]
+                await self.send(session, pong)
             elif kind == "rename":
                 session.name = clean_name(str(msg.get("name", "")))
                 await asyncio.to_thread(self.directory.update, session.uid, session.name, session.color)
