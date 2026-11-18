@@ -25,17 +25,18 @@ import bluffView from './views/bluff.js';
 import pokerView from './views/poker.js';
 import geoView from './views/geo.js';
 import flagsView from './views/flags.js';
+import ludoView from './views/ludo.js';
 import facesView from './views/faces.js';
 
 const VIEWS = {
   home: homeView, chat: chatView, caro: caroView, chess: chessView,
   xiangqi: xiangqiView, ship: shipView, bluff: bluffView, poker: pokerView,
-  geo: geoView, flags: flagsView, faces: facesView,
+  geo: geoView, flags: flagsView, ludo: ludoView, faces: facesView,
 };
 const NAV_ICON = {
   home: 'home', chat: 'chat', caro: 'caro', chess: 'chess',
   xiangqi: 'xiangqi', ship: 'ship', bluff: 'cards', poker: 'cards',
-  geo: 'globe', flags: 'flag', faces: 'face',
+  geo: 'globe', flags: 'flag', ludo: 'horse', faces: 'face',
 };
 
 const el = (id) => document.getElementById(id);
@@ -274,6 +275,41 @@ function renderPresence(users) {
 let connectAttempted = false;
 let lastConnOk = false;
 let lastConnMode = 'ws';
+let lastPingInfo = { ms: null, avg: null, jitter: null, mode: 'ws', ready: false };
+
+function pingTier(info) {
+  if (!info?.ready || info.ms === null || info.ms === undefined) return 'off';
+  if (info.ms < 80) return 'good';
+  if (info.ms <= 180) return 'ok';
+  return 'bad';
+}
+
+function updatePingUi(info = lastPingInfo) {
+  lastPingInfo = info;
+  const connText = el('connLabel')?.querySelector('.conn-text');
+  if (connText && lastConnOk) {
+    const modeTag = lastConnMode === 'poll' ? ' (HTTP)' : lastConnMode === 'sse' ? ' (SSE)' : '';
+    const pingTag = info.ms !== null ? ` · ${info.ms} ms` : '';
+    connText.textContent = t('shell.connected') + modeTag + pingTag;
+  }
+
+  const pill = el('pingPill');
+  if (!pill) return;
+  const tier = pingTier(info);
+  pill.className = `topbar-btn ping-pill ${tier}`;
+  const msNode = pill.querySelector('.ping-ms');
+  if (msNode) {
+    msNode.textContent = info.ready && info.ms !== null ? `${info.ms} ms` : '-- ms';
+  }
+  pill.title = info.ready && info.ms !== null
+    ? t('shell.pingToast', {
+        ms: info.ms,
+        avg: info.avg ?? info.ms,
+        jitter: info.jitter ?? 0,
+        mode: String(info.mode || 'ws').toUpperCase(),
+      })
+    : t('shell.pingOff');
+}
 
 function setConn(ok, mode = lastConnMode) {
   lastConnOk = ok;
@@ -285,7 +321,8 @@ function setConn(ok, mode = lastConnMode) {
   label.classList.toggle('warn', !ok && connectAttempted);
   if (ok) {
     const modeTag = lastConnMode === 'poll' ? ' (HTTP)' : lastConnMode === 'sse' ? ' (SSE)' : '';
-    textNode.textContent = t('shell.connected') + modeTag;
+    const pingTag = lastPingInfo.ms !== null ? ` · ${lastPingInfo.ms} ms` : '';
+    textNode.textContent = t('shell.connected') + modeTag + pingTag;
     label.title = lastConnMode === 'poll'
       ? t('shell.connTitlePoll')
       : lastConnMode === 'sse'
@@ -304,6 +341,30 @@ function renderTopbarActions() {
   if (!host) return;
   const on = soundEnabled();
   const themeMeta = getThemeMeta();
+
+  const pingBtn = h('button', {
+    id: 'pingPill',
+    type: 'button',
+    class: 'topbar-btn ping-pill off',
+    title: t('shell.pingTitle'),
+    'aria-label': t('shell.pingTitle'),
+    onclick: () => {
+      net.measurePing();
+      if (lastPingInfo.ready && lastPingInfo.ms !== null) {
+        toast(t('shell.pingToast', {
+          ms: lastPingInfo.ms,
+          avg: lastPingInfo.avg ?? lastPingInfo.ms,
+          jitter: lastPingInfo.jitter ?? 0,
+          mode: String(lastPingInfo.mode || 'ws').toUpperCase(),
+        }));
+      } else {
+        toast(t('shell.pingOff'), 'warn');
+      }
+    },
+  },
+    h('span', { class: 'ping-bars', 'aria-hidden': 'true' },
+      h('i', {}), h('i', {}), h('i', {}), h('i', {})),
+    h('span', { class: 'ping-ms mono' }, '-- ms'));
 
   const soundBtn = h('button', {
     id: 'soundBtn',
@@ -333,7 +394,8 @@ function renderTopbarActions() {
     h('span', { class: 'theme-dot', 'aria-hidden': 'true' }),
     h('span', { class: 'theme-trigger-label' }, themeMeta.name));
 
-  mount(host, soundBtn, themeBtn);
+  mount(host, pingBtn, soundBtn, themeBtn);
+  updatePingUi(lastPingInfo);
 }
 
 function applyShellI18n() {
@@ -476,6 +538,7 @@ function refreshUnreadBadges() {
 }
 
 net.onStatus(setConn);
+net.onPing(updatePingUi);
 
 /* ------------------------------------------------------------ đổi avatar -- */
 /** Tải ảnh lên làm avatar rồi đồng bộ lại mọi nơi đang hiện nó.
@@ -602,7 +665,9 @@ async function boot() {
   await render();
 
   pollRoomCounts();
-  setInterval(pollRoomCounts, 12000);
+  setInterval(() => {
+    if (!document.hidden) pollRoomCounts();
+  }, 12000);
 
   // Mời bật thông báo, nhưng chỉ sau khi UI đã yên: hộp nhập tên vừa đóng mà
   // đã đẩy tiếp một thẻ nữa thì rất khó chịu. Chỉ hiện một lần cho mỗi
