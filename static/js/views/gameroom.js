@@ -230,7 +230,9 @@ export async function renderLobby(root, ctx, channel,
   }
 
   await refresh();
-  const timer = setInterval(refresh, 4000);
+  const timer = setInterval(() => {
+    if (!document.hidden) refresh();
+  }, 4000);
   return () => clearInterval(timer);
 }
 
