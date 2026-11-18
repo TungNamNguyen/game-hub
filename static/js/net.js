@@ -22,6 +22,11 @@ export class Net {
     this.handlers = new Map();      // channel -> Set<fn>
     this.rejoiners = new Set();     // fn gọi lại sau khi nối lại
     this.statusFns = new Set();
+    this.pingFns = new Set();
+    this.pingMs = null;
+    this.avgPingMs = null;
+    this.jitterMs = null;
+    this._lastPingAt = 0;
     this.delay = 400;
     this.pingTimer = null;
     this.retryTimer = null;
@@ -34,6 +39,13 @@ export class Net {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', () => this._beaconClose());
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && this.ready) {
+            this.measurePing();
+          }
+        });
+      }
     }
   }
 
@@ -60,6 +72,12 @@ export class Net {
     return () => this.statusFns.delete(fn);
   }
 
+  onPing(fn) {
+    this.pingFns.add(fn);
+    fn({ ms: this.pingMs, avg: this.avgPingMs, jitter: this.jitterMs, mode: this.mode, ready: this.ready });
+    return () => this.pingFns.delete(fn);
+  }
+
   /** View gọi hàm này để tự vào lại phòng sau khi mất kết nối. */
   onRejoin(fn) {
     this.rejoiners.add(fn);
@@ -70,6 +88,48 @@ export class Net {
     for (const fn of this.statusFns) {
       try { fn(this.ready, this.mode); } catch { /* bỏ qua */ }
     }
+    this._emitPing();
+  }
+
+  _emitPing() {
+    const info = { ms: this.pingMs, avg: this.avgPingMs, jitter: this.jitterMs, mode: this.mode, ready: this.ready };
+    for (const fn of this.pingFns) {
+      try { fn(info); } catch { /* bỏ qua */ }
+    }
+  }
+
+  _recordPing(rawMs) {
+    if (!Number.isFinite(rawMs)) return;
+    const ms = Math.max(1, Math.round(rawMs));
+    if (this.pingMs !== null) {
+      const diff = Math.abs(ms - this.pingMs);
+      this.jitterMs = this.jitterMs === null ? diff : Math.round(this.jitterMs * 0.7 + diff * 0.3);
+    } else {
+      this.jitterMs = 0;
+    }
+    this.pingMs = ms;
+    this.avgPingMs = this.avgPingMs === null ? ms : Math.round(this.avgPingMs * 0.7 + ms * 0.3);
+    this._emitPing();
+  }
+
+  measurePing() {
+    if (!this.ready || this.closing) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this._lastPingAt = now;
+    this.send('hub', 'ping', { ts: now });
+  }
+
+  _startPingLoop() {
+    clearInterval(this.pingTimer);
+    this.measurePing();
+    this.pingTimer = setInterval(() => {
+      if (!this.ready || this.closing) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (now - this._lastPingAt < 18000) return;
+      }
+      this.measurePing();
+    }, 5000);
   }
 
   _dispatchMsg(msg) {
@@ -189,13 +249,16 @@ export class Net {
         sock.send(JSON.stringify(this.queue.shift()));
       }
       this._runRejoiners();
-      clearInterval(this.pingTimer);
-      this.pingTimer = setInterval(() => this.send('hub', 'ping'), 20000);
+      this._startPingLoop();
     };
 
     sock.onmessage = (event) => {
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg && msg.ch === 'hub' && msg.t === 'pong' && typeof msg.ts === 'number') {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        this._recordPing(now - msg.ts);
+      }
       this._dispatchMsg(msg);
     };
 
@@ -265,7 +328,13 @@ export class Net {
       this.lastSeq = seq;
     }
     if (!Array.isArray(messages)) return;
-    for (const msg of messages) this._dispatchMsg(msg);
+    for (const msg of messages) {
+      if (msg && msg.ch === 'hub' && msg.t === 'pong' && typeof msg.ts === 'number') {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        this._recordPing(now - msg.ts);
+      }
+      this._dispatchMsg(msg);
+    }
   }
 
   _startSse() {
@@ -295,8 +364,7 @@ export class Net {
       clearTimeout(this.sseProbeTimer);
       this.mode = 'sse';
       this._emitStatus();
-      clearInterval(this.pingTimer);
-      this.pingTimer = setInterval(() => this.send('hub', 'ping'), 20000);
+      this._startPingLoop();
     });
 
     es.onmessage = (event) => {
@@ -323,7 +391,7 @@ export class Net {
     if (this.closing || !this.sid) return;
     this.mode = 'poll';
     this._emitStatus();
-    clearInterval(this.pingTimer);
+    this._startPingLoop();
 
     const ctrl = new AbortController();
     this.pollAbort = ctrl;
