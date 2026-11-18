@@ -9,9 +9,9 @@ import { toast } from '../ui.js';
 
 const TILE_ICON = {
   chat: 'chat', caro: 'caro', chess: 'chess', xiangqi: 'xiangqi', ship: 'ship',
-  bluff: 'cards', poker: 'cards', geo: 'globe', flags: 'flag', faces: 'face',
+  bluff: 'cards', poker: 'cards', geo: 'globe', flags: 'flag', ludo: 'horse', faces: 'face',
 };
-const QUICK_ORDER = ['chess', 'xiangqi', 'caro', 'ship', 'bluff', 'poker', 'flags'];
+const QUICK_ORDER = ['chess', 'xiangqi', 'caro', 'ship', 'ludo', 'bluff', 'poker', 'flags'];
 
 export default {
   async mount(root, ctx) {
@@ -273,7 +273,9 @@ export default {
     });
 
     await refresh();
-    const timer = setInterval(refresh, 5000);
+    const timer = setInterval(() => {
+      if (!document.hidden) refresh();
+    }, 5000);
 
     return () => { clearInterval(timer); stopPresence(); };
   },
