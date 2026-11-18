@@ -18,7 +18,7 @@ MAX_STREAK_ROUNDS = 50
 GUESS_SECONDS = 60.0
 PANIC_SECONDS = 15.0
 REVEAL_SECONDS = 8.0
-GRACE_SECONDS = 0.5
+GRACE_SECONDS = 0.15
 EARTH_RADIUS_KM = 6371.071
 DEFAULT_WORLD_MAX_ERROR_KM = 14916.862
 # Lưu ở thư mục assets/ để tách biệt dữ liệu tĩnh với data/ (vốn bị .dockerignore chặn)
