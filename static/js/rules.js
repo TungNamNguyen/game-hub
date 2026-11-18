@@ -181,6 +181,27 @@ export const GAME_RULES = [
       'Dùng phím số 1, 2, 3, 4 ở chế độ Trắc nghiệm để phản xạ trước đối thủ!',
     ],
   },
+  {
+    id: 'ludo',
+    name: 'Cờ Cá Ngựa',
+    icon: 'horse',
+    players: '2–4 người (hoặc với Máy · Đủ 4 tự bắt đầu)',
+    goal: 'Đưa toàn bộ 4 quân ngựa của mình chạy hết 1 vòng 56 ô và xếp kín 4 bậc cao nhất (3, 4, 5, 6) trong chuồng đích trước đối thủ.',
+    basics: [
+      'Cơ chế Chủ phòng: Khi phòng đủ 4 người ngồi ghế, ván đấu tự động bắt đầu ngay! Nếu chưa đủ 4 người, Chủ phòng (👑) có thể thêm Máy hoặc bấm "Bắt đầu ngay" bất cứ lúc nào.',
+      'Xuất quân: Tung được 1 hoặc 6 (hoặc chỉ 6 ở chế độ Cổ điển) để đưa một quân ngựa từ chuồng ra Ô Xuất Quân.',
+      'Cản đường: Trên đường đi tiến, ngựa KHÔNG được nhảy qua đầu bất kỳ quân ngựa nào đứng chắn ở các ô trung gian.',
+      'Đá tiến & Thưởng lượt: Nếu bước cuối đáp đúng vào ô có ngựa đối phương, bạn ĐÁ văng quân đó về chuồng và được THƯỞNG thêm lượt tung xúc xắc (tối đa 3 lần ra 6 liên tiếp).',
+      'Leo chuồng (1 → 6): Khi dừng tại Ô Cửa Chuồng, tung số k (1–6) sẽ vào thẳng bậc k nếu không bị quân mình chắn; từ bậc r trong chuồng phải tung đúng r+1 để tiến lên.',
+    ],
+    specials: [
+      '⚔️ Cơ chế ĐÁ HẬU: Khi ngựa của bạn đang trên vòng ngoài và có quân đối phương đứng phía sau đúng bằng số xúc xắc vừa tung (không bị cản ở giữa và không lùi quá ô xuất phát), bạn có thể phóng lùi ĐÁ HẬU văng đối thủ về chuồng và nhận thêm lượt!',
+    ],
+    tips: [
+      'Luôn để ý những quân địch bám sát phía sau 1–6 bước — tung đúng số là có thể tung đòn Đá Hậu bất ngờ!',
+      'Đừng dồn quân đứng ngay trước mặt hoặc ngay sau lưng đối thủ khi không cần thiết.',
+    ],
+  },
 ];
 
 export const GAME_RULES_EN = [
@@ -354,6 +375,26 @@ export const GAME_RULES_EN = [
     ],
     tips: [
       'In Typing mode, diacritics are optional and common aliases like USA, UK, or Hanoi/Beijing work smoothly.',
+    ],
+  },
+  {
+    id: 'ludo',
+    name: 'Ludo (Cá Ngựa)',
+    icon: 'horse',
+    players: '2–4 players (or vs Bots · Auto-starts at 4)',
+    goal: 'Race all 4 of your horses around the 56-cell track and fill the top 4 home ranks (3, 4, 5, 6) before anyone else.',
+    basics: [
+      'Host & Auto-start: The match auto-starts immediately when all 4 seats are filled. With fewer than 4 players, the Host (👑) can add AI Bots or press Start anytime.',
+      'Deploy: Roll 1 or 6 (or 6-only in Strict mode) to deploy a horse from your stable onto your start square.',
+      'Blocking: Horses cannot jump over any piece (yours or an opponent\'s) standing on intermediate squares.',
+      'Kick & Bonus Roll: Landing on an enemy horse sends it back to its stable and grants an extra roll (rolling 6 also grants an extra roll, up to 3 sixes in a row).',
+      'Home Climb (1–6): From your Home Door, rolling k jumps straight into home rank k if unobstructed; inside home, roll r+1 to climb from rank r to r+1.',
+    ],
+    specials: [
+      '⚔️ Backward Kick (Đá Hậu): If an enemy horse sits behind yours at the exact rolled distance (unblocked and not past your start cell), you can leap backward to kick them back to their stable and earn a bonus roll!',
+    ],
+    tips: [
+      'Watch enemies trailing 1–6 steps behind your horses — a matching roll unlocks a surprise Backward Kick!',
     ],
   },
 ];
