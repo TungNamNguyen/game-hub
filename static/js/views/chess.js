@@ -141,6 +141,20 @@ function mountRoom(root, ctx, code) {
       if (!promo) promo = 'Q';
     }
     selected = -1;
+    // Optimistic UI: di chuyển quân ngay lập tức trên bàn (0ms)
+    if (state && state.board) {
+      const myColor = state.colorOf[state.you.mark];
+      state.board[option.to] = promo ? (myColor + promo) : state.board[frm];
+      state.board[frm] = '';
+      state.lastMove = [frm, option.to];
+      state.turn = state.you.mark === 'X' ? 'O' : 'X';
+      state.legal = {};
+      sfx.move();
+      renderBoard();
+      const info = statusText(state);
+      statusBar.textContent = info.text;
+      statusBar.className = 'status-bar ' + info.cls;
+    }
     net.send(CHANNEL, 'move', { from: frm, to: option.to, promo });
   }
 
@@ -153,18 +167,18 @@ function mountRoom(root, ctx, code) {
     if (selected >= 0) {
       const option = movesFrom(selected).find((m) => m.to === index);
       if (option) { commit(selected, option); return; }
-      if (index === selected) { selected = -1; render(); return; }
+      if (index === selected) { selected = -1; renderBoard(); return; }
     }
     if (movesFrom(index).length) {
       selected = index;
-      render();
+      renderBoard();
     } else if (state.board[index] && state.board[index][0] === state.colorOf[state.you.mark]) {
       selected = -1;
       toast(t('chess.noMovesPiece'));
-      render();
-    } else {
+      renderBoard();
+    } else if (selected >= 0) {
       selected = -1;
-      render();
+      renderBoard();
     }
   }
 
