@@ -738,8 +738,11 @@ export default {
     const lockCurrentPin = () => {
       const pin = draftPin || state?.myDraft;
       if (!pin || !state || state.phase !== 'guessing' || !state.you?.mark) return;
-      send('guess', { lat: pin.lat, lng: pin.lng });
+      state.myGuess = { lat: pin.lat, lng: pin.lng };
+      renderGuessBar();
+      syncMapMarkers();
       sfx.move();
+      send('guess', { lat: pin.lat, lng: pin.lng });
     };
 
     guessBtn.onclick = lockCurrentPin;
