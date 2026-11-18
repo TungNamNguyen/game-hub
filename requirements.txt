@@ -1,0 +1,6 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+websockets==17.1
+python-multipart==0.0.32
+Pillow==11.2.1
+psycopg[binary,pool]==3.3.9

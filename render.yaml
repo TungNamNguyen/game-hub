@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: game-hub
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: BOT_CONCURRENCY
+        value: "1"
+      - key: BOT_BUDGET_SCALE
+        value: "0.5"

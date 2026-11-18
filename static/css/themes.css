@@ -1,0 +1,634 @@
+/* ==========================================================================
+   Game Hub — Hệ thống 16 Theme (10 Dark & 6 Light)
+   ========================================================================== */
+
+/* -------------------------------------------------- 1. Tokyo Night -------- */
+[data-theme="tokyo"] {
+  --bg: #13141c;
+  --bg-soft: #16161e;
+  --surface: #1a1b26;
+  --surface-2: #222436;
+  --surface-3: #2c2f47;
+  --border: #3b4261;
+  --border-soft: #26293d;
+
+  --text: #c0caf5;
+  --text-dim: #9aa5ce;
+  --text-muted: #6c759e;
+
+  --accent: #7aa2f7;
+  --accent-soft: #89b4fa;
+  --accent-dim: rgba(122, 162, 247, 0.16);
+  --accent-grad: linear-gradient(135deg, #7aa2f7, #bb9af7);
+  --accent-glow: rgba(122, 162, 247, 0.36);
+
+  --ok: #9ece6a;
+  --ok-dim: rgba(158, 206, 106, 0.14);
+  --warn: #e0af68;
+  --warn-dim: rgba(224, 175, 104, 0.14);
+  --danger: #f7768e;
+  --danger-dim: rgba(247, 118, 142, 0.16);
+  --info: #7dcfff;
+
+  --glass: rgba(19, 20, 28, 0.86);
+  --glass-soft: rgba(19, 20, 28, 0.74);
+  --scrim: rgba(8, 9, 14, 0.74);
+
+  --mesh:
+    radial-gradient(58% 58% at 20% 0%, rgba(122, 162, 247, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 85% 12%, rgba(187, 154, 247, 0.14), transparent 70%),
+    radial-gradient(45% 45% at 35% 100%, rgba(125, 207, 255, 0.08), transparent 70%);
+}
+
+/* -------------------------------------------------- 2. Cyberpunk Neon ----- */
+[data-theme="cyberpunk"] {
+  --bg: #0d0221;
+  --bg-soft: #120433;
+  --surface: #190a3a;
+  --surface-2: #221052;
+  --surface-3: #2c1666;
+  --border: #3a1f7a;
+  --border-soft: #2a1560;
+
+  --text: #f3e8ff;
+  --text-dim: #c9b6f0;
+  --text-muted: #8d7bc0;
+
+  --accent: #ff007f;
+  --accent-soft: #ff4fa3;
+  --accent-dim: rgba(255, 0, 127, 0.18);
+  --accent-grad: linear-gradient(135deg, #ff007f, #00f0ff);
+  --accent-glow: rgba(255, 0, 127, 0.42);
+
+  --ok: #00f0ff;
+  --ok-dim: rgba(0, 240, 255, 0.14);
+  --warn: #ffd60a;
+  --warn-dim: rgba(255, 214, 10, 0.14);
+  --danger: #ff2e63;
+  --danger-dim: rgba(255, 46, 99, 0.16);
+  --info: #00f0ff;
+
+  --glass: rgba(13, 2, 33, 0.85);
+  --glass-soft: rgba(13, 2, 33, 0.72);
+  --scrim: rgba(5, 1, 15, 0.74);
+
+  --mesh:
+    radial-gradient(55% 55% at 20% 0%, rgba(255, 0, 127, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 85% 10%, rgba(0, 240, 255, 0.16), transparent 70%),
+    radial-gradient(40% 40% at 50% 100%, rgba(157, 0, 255, 0.14), transparent 70%);
+}
+
+/* -------------------------------------------------- 3. Synthwave 80s ------ */
+[data-theme="synthwave"] {
+  --bg: #140724;
+  --bg-soft: #1c0b2e;
+  --surface: #24113b;
+  --surface-2: #2e164a;
+  --surface-3: #3b1d5e;
+  --border: #4e287c;
+  --border-soft: #381b5c;
+
+  --text: #fdf4ff;
+  --text-dim: #e2c6f5;
+  --text-muted: #a682c4;
+
+  --accent: #f97316;
+  --accent-soft: #fb923c;
+  --accent-dim: rgba(249, 115, 22, 0.18);
+  --accent-grad: linear-gradient(135deg, #f97316, #ec4899);
+  --accent-glow: rgba(236, 72, 153, 0.42);
+
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.14);
+  --warn: #facc15;
+  --warn-dim: rgba(250, 204, 21, 0.14);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.16);
+  --info: #38bdf8;
+
+  --glass: rgba(20, 7, 36, 0.86);
+  --glass-soft: rgba(20, 7, 36, 0.72);
+  --scrim: rgba(10, 3, 20, 0.74);
+
+  --mesh:
+    radial-gradient(60% 55% at 18% 0%, rgba(249, 115, 22, 0.2), transparent 70%),
+    radial-gradient(50% 50% at 88% 12%, rgba(236, 72, 153, 0.22), transparent 70%),
+    radial-gradient(45% 45% at 50% 100%, rgba(56, 189, 248, 0.12), transparent 70%);
+}
+
+/* -------------------------------------------------- 4. Dracula Noir ------- */
+[data-theme="dracula"] {
+  --bg: #191a24;
+  --bg-soft: #21222c;
+  --surface: #282a36;
+  --surface-2: #313443;
+  --surface-3: #3d4052;
+  --border: #4b4f66;
+  --border-soft: #393c4e;
+
+  --text: #f8f8f2;
+  --text-dim: #cdd2e6;
+  --text-muted: #8b93b5;
+
+  --accent: #bd93f9;
+  --accent-soft: #caa9fa;
+  --accent-dim: rgba(189, 147, 249, 0.18);
+  --accent-grad: linear-gradient(135deg, #bd93f9, #ff79c6);
+  --accent-glow: rgba(189, 147, 249, 0.38);
+
+  --ok: #50fa7b;
+  --ok-dim: rgba(80, 250, 123, 0.14);
+  --warn: #f1fa8c;
+  --warn-dim: rgba(241, 250, 140, 0.14);
+  --danger: #ff5555;
+  --danger-dim: rgba(255, 85, 85, 0.16);
+  --info: #8be9fd;
+
+  --glass: rgba(25, 26, 36, 0.86);
+  --glass-soft: rgba(25, 26, 36, 0.74);
+  --scrim: rgba(12, 13, 18, 0.72);
+
+  --mesh:
+    radial-gradient(55% 55% at 22% 0%, rgba(189, 147, 249, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 85% 10%, rgba(255, 121, 198, 0.13), transparent 70%),
+    radial-gradient(40% 40% at 30% 100%, rgba(139, 233, 253, 0.08), transparent 70%);
+}
+
+/* -------------------------------------------------- 5. Aurora Borealis ---- */
+[data-theme="aurora"] {
+  --bg: #061317;
+  --bg-soft: #09191f;
+  --surface: #0c2026;
+  --surface-2: #122b33;
+  --surface-3: #183842;
+  --border: #234d59;
+  --border-soft: #16343d;
+
+  --text: #e6faf8;
+  --text-dim: #a3d5d1;
+  --text-muted: #689b98;
+
+  --accent: #14b8a6;
+  --accent-soft: #2dd4bf;
+  --accent-dim: rgba(20, 184, 166, 0.18);
+  --accent-grad: linear-gradient(135deg, #14b8a6, #38bdf8);
+  --accent-glow: rgba(20, 184, 166, 0.36);
+
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.14);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.14);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.16);
+  --info: #38bdf8;
+
+  --glass: rgba(6, 19, 23, 0.86);
+  --glass-soft: rgba(6, 19, 23, 0.72);
+  --scrim: rgba(3, 10, 12, 0.74);
+
+  --mesh:
+    radial-gradient(58% 58% at 18% 0%, rgba(20, 184, 166, 0.2), transparent 70%),
+    radial-gradient(52% 52% at 88% 12%, rgba(56, 189, 248, 0.16), transparent 70%),
+    radial-gradient(45% 45% at 45% 100%, rgba(52, 211, 153, 0.1), transparent 70%);
+}
+
+/* -------------------------------------------------- 6. Crimson Velvet ----- */
+[data-theme="crimson"] {
+  --bg: #14070a;
+  --bg-soft: #1b090e;
+  --surface: #210c12;
+  --surface-2: #2c1119;
+  --surface-3: #381721;
+  --border: #522230;
+  --border-soft: #36151f;
+
+  --text: #fff1f2;
+  --text-dim: #e6b8c1;
+  --text-muted: #a6717c;
+
+  --accent: #e11d48;
+  --accent-soft: #fb7185;
+  --accent-dim: rgba(225, 29, 72, 0.18);
+  --accent-grad: linear-gradient(135deg, #e11d48, #fb923c);
+  --accent-glow: rgba(225, 29, 72, 0.38);
+
+  --ok: #34d399;
+  --ok-dim: rgba(52, 211, 153, 0.14);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.15);
+  --danger: #ff4d6d;
+  --danger-dim: rgba(255, 77, 109, 0.18);
+  --info: #fb923c;
+
+  --glass: rgba(20, 7, 10, 0.86);
+  --glass-soft: rgba(20, 7, 10, 0.72);
+  --scrim: rgba(10, 3, 5, 0.76);
+
+  --mesh:
+    radial-gradient(55% 55% at 20% 0%, rgba(225, 29, 72, 0.2), transparent 70%),
+    radial-gradient(50% 50% at 88% 10%, rgba(251, 146, 60, 0.14), transparent 70%),
+    radial-gradient(40% 40% at 50% 100%, rgba(190, 18, 60, 0.12), transparent 70%);
+}
+
+/* -------------------------------------------------- 7. Royal Casino ------- */
+[data-theme="casino"] {
+  --bg: #080f0b;
+  --bg-soft: #0e1913;
+  --surface: #132219;
+  --surface-2: #1a2e22;
+  --surface-3: #223b2c;
+  --border: #2d4e3a;
+  --border-soft: #20382a;
+
+  --text: #f7f5eb;
+  --text-dim: #cbd5c7;
+  --text-muted: #829688;
+
+  --accent: #d97706;
+  --accent-soft: #fbbf24;
+  --accent-dim: rgba(251, 191, 36, 0.16);
+  --accent-grad: linear-gradient(135deg, #eab308, #d97706);
+  --accent-glow: rgba(234, 179, 8, 0.36);
+
+  --ok: #10b981;
+  --ok-dim: rgba(16, 185, 129, 0.15);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.16);
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.16);
+  --info: #34d399;
+
+  --glass: rgba(8, 15, 11, 0.86);
+  --glass-soft: rgba(8, 15, 11, 0.74);
+  --scrim: rgba(3, 8, 5, 0.74);
+
+  --mesh:
+    radial-gradient(60% 55% at 20% 0%, rgba(234, 179, 8, 0.15), transparent 70%),
+    radial-gradient(50% 50% at 85% 15%, rgba(16, 185, 129, 0.16), transparent 70%),
+    radial-gradient(45% 45% at 50% 100%, rgba(217, 119, 6, 0.1), transparent 70%);
+}
+
+/* -------------------------------------------------- 8. Deep Ocean --------- */
+[data-theme="ocean"] {
+  --bg: #0b192c;
+  --bg-soft: #0f2138;
+  --surface: #183252;
+  --surface-2: #1f3f66;
+  --surface-3: #284f7e;
+  --border: #336196;
+  --border-soft: #244872;
+
+  --text: #eaf6ff;
+  --text-dim: #add0e8;
+  --text-muted: #7da2bf;
+
+  --accent: #0284c7;
+  --accent-soft: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.18);
+  --accent-grad: linear-gradient(135deg, #0284c7, #38bdf8);
+  --accent-glow: rgba(56, 189, 248, 0.36);
+
+  --ok: #2dd4bf;
+  --ok-dim: rgba(45, 212, 191, 0.14);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.14);
+  --danger: #f87171;
+  --danger-dim: rgba(248, 113, 113, 0.16);
+  --info: #38bdf8;
+
+  --glass: rgba(11, 25, 44, 0.85);
+  --glass-soft: rgba(11, 25, 44, 0.72);
+  --scrim: rgba(4, 10, 20, 0.72);
+
+  --mesh:
+    radial-gradient(60% 60% at 15% 0%, rgba(56, 189, 248, 0.18), transparent 70%),
+    radial-gradient(50% 50% at 90% 15%, rgba(45, 212, 191, 0.12), transparent 70%),
+    radial-gradient(45% 45% at 30% 100%, rgba(2, 132, 199, 0.14), transparent 70%);
+}
+
+/* -------------------------------------------------- 9. Emerald Forest ----- */
+[data-theme="forest"] {
+  --bg: #0c1b11;
+  --bg-soft: #112418;
+  --surface: #173120;
+  --surface-2: #1f402a;
+  --surface-3: #274f34;
+  --border: #336643;
+  --border-soft: #23472f;
+
+  --text: #eaf7ec;
+  --text-dim: #b6d9ba;
+  --text-muted: #82aa87;
+
+  --accent: #16a34a;
+  --accent-soft: #84cc16;
+  --accent-dim: rgba(132, 204, 22, 0.18);
+  --accent-grad: linear-gradient(135deg, #16a34a, #84cc16);
+  --accent-glow: rgba(132, 204, 22, 0.34);
+
+  --ok: #84cc16;
+  --ok-dim: rgba(132, 204, 22, 0.14);
+  --warn: #f2b705;
+  --warn-dim: rgba(242, 183, 5, 0.14);
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.16);
+  --info: #4dd0c4;
+
+  --glass: rgba(12, 27, 17, 0.85);
+  --glass-soft: rgba(12, 27, 17, 0.72);
+  --scrim: rgba(6, 14, 9, 0.72);
+
+  --mesh:
+    radial-gradient(55% 55% at 20% 0%, rgba(132, 204, 22, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 85% 10%, rgba(22, 163, 74, 0.2), transparent 70%),
+    radial-gradient(45% 45% at 40% 100%, rgba(77, 208, 196, 0.08), transparent 70%);
+}
+
+/* -------------------------------------------------- 10. Nordic Light ------ */
+[data-theme="corporate"] {
+  --bg: #f8fafc;
+  --bg-soft: #eef2f7;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --border: #cbd5e1;
+  --border-soft: #e2e8f0;
+
+  --text: #0f172a;
+  --text-dim: #475569;
+  --text-muted: #64748b;
+
+  --accent: #2563eb;
+  --accent-soft: #3b82f6;
+  --accent-dim: rgba(37, 99, 235, 0.1);
+  --accent-grad: linear-gradient(135deg, #2563eb, #0ea5e9);
+  --accent-glow: rgba(37, 99, 235, 0.26);
+
+  --ok: #16a34a;
+  --ok-dim: rgba(22, 163, 74, 0.11);
+  --warn: #d97706;
+  --warn-dim: rgba(217, 119, 6, 0.12);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.1);
+  --info: #0284c7;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 24px 56px rgba(15, 23, 42, 0.16), 0 8px 16px rgba(15, 23, 42, 0.08);
+
+  --glass: rgba(248, 250, 252, 0.85);
+  --glass-soft: rgba(248, 250, 252, 0.72);
+  --scrim: rgba(15, 23, 42, 0.42);
+
+  --mesh:
+    radial-gradient(55% 55% at 20% 0%, rgba(37, 99, 235, 0.09), transparent 70%),
+    radial-gradient(50% 50% at 85% 10%, rgba(14, 165, 233, 0.07), transparent 70%);
+}
+
+/* -------------------------------------------------- 11. Matcha Latte ------ */
+[data-theme="matcha"] {
+  --bg: #f4f7f2;
+  --bg-soft: #e9efe5;
+  --surface: #ffffff;
+  --surface-2: #ecf2e7;
+  --surface-3: #dce6d5;
+  --border: #bccdb1;
+  --border-soft: #d5e2cc;
+
+  --text: #1c2b17;
+  --text-dim: #465e3d;
+  --text-muted: #6c8462;
+
+  --accent: #4d7c0f;
+  --accent-soft: #65a30d;
+  --accent-dim: rgba(101, 163, 13, 0.14);
+  --accent-grad: linear-gradient(135deg, #4d7c0f, #84cc16);
+  --accent-glow: rgba(77, 124, 15, 0.25);
+
+  --ok: #16a34a;
+  --ok-dim: rgba(22, 163, 74, 0.12);
+  --warn: #d97706;
+  --warn-dim: rgba(217, 119, 6, 0.12);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.1);
+  --info: #0d9488;
+
+  --shadow-xs: 0 1px 2px rgba(28, 43, 23, 0.06);
+  --shadow-sm: 0 2px 8px rgba(28, 43, 23, 0.08), 0 1px 2px rgba(28, 43, 23, 0.04);
+  --shadow: 0 8px 24px rgba(28, 43, 23, 0.1), 0 2px 6px rgba(28, 43, 23, 0.06);
+  --shadow-lg: 0 24px 56px rgba(28, 43, 23, 0.16), 0 8px 16px rgba(28, 43, 23, 0.08);
+
+  --glass: rgba(244, 247, 242, 0.86);
+  --glass-soft: rgba(244, 247, 242, 0.72);
+  --scrim: rgba(28, 43, 23, 0.4);
+
+  --mesh:
+    radial-gradient(58% 58% at 18% 0%, rgba(132, 204, 22, 0.18), transparent 70%),
+    radial-gradient(50% 50% at 88% 12%, rgba(77, 124, 15, 0.1), transparent 70%);
+}
+
+/* -------------------------------------------------- 12. Lavender Mist ----- */
+[data-theme="lavender"] {
+  --bg: #f6f4ff;
+  --bg-soft: #ede9fe;
+  --surface: #ffffff;
+  --surface-2: #f1edff;
+  --surface-3: #e3dcff;
+  --border: #c4b5fd;
+  --border-soft: #ddd6fe;
+
+  --text: #26174a;
+  --text-dim: #543e8a;
+  --text-muted: #7a68a6;
+
+  --accent: #7c3aed;
+  --accent-soft: #8b5cf6;
+  --accent-dim: rgba(124, 58, 237, 0.12);
+  --accent-grad: linear-gradient(135deg, #7c3aed, #ec4899);
+  --accent-glow: rgba(124, 58, 237, 0.26);
+
+  --ok: #16a34a;
+  --ok-dim: rgba(22, 163, 74, 0.11);
+  --warn: #d97706;
+  --warn-dim: rgba(217, 119, 6, 0.12);
+  --danger: #e11d48;
+  --danger-dim: rgba(225, 29, 72, 0.11);
+  --info: #0284c7;
+
+  --shadow-xs: 0 1px 2px rgba(38, 23, 74, 0.06);
+  --shadow-sm: 0 2px 8px rgba(38, 23, 74, 0.08), 0 1px 2px rgba(38, 23, 74, 0.04);
+  --shadow: 0 8px 24px rgba(38, 23, 74, 0.1), 0 2px 6px rgba(38, 23, 74, 0.06);
+  --shadow-lg: 0 24px 56px rgba(38, 23, 74, 0.16), 0 8px 16px rgba(38, 23, 74, 0.08);
+
+  --glass: rgba(246, 244, 255, 0.86);
+  --glass-soft: rgba(246, 244, 255, 0.72);
+  --scrim: rgba(38, 23, 74, 0.4);
+
+  --mesh:
+    radial-gradient(58% 58% at 18% 0%, rgba(167, 139, 250, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 88% 12%, rgba(236, 72, 153, 0.12), transparent 70%);
+}
+
+/* -------------------------------------------------- 13. Sunset Warm ------- */
+[data-theme="sunset"] {
+  --bg: #fff7ed;
+  --bg-soft: #fef1e2;
+  --surface: #ffffff;
+  --surface-2: #ffedd5;
+  --surface-3: #fed7aa;
+  --border: #fdba74;
+  --border-soft: #fed7aa;
+
+  --text: #431407;
+  --text-dim: #7c2d12;
+  --text-muted: #9a5b3c;
+
+  --accent: #ea580c;
+  --accent-soft: #f97316;
+  --accent-dim: rgba(234, 88, 12, 0.14);
+  --accent-grad: linear-gradient(135deg, #ea580c, #fbbf24);
+  --accent-glow: rgba(234, 88, 12, 0.28);
+
+  --ok: #16a34a;
+  --ok-dim: rgba(22, 163, 74, 0.12);
+  --warn: #d97706;
+  --warn-dim: rgba(251, 191, 36, 0.2);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.12);
+  --info: #0284c7;
+
+  --shadow-xs: 0 1px 2px rgba(120, 53, 15, 0.08);
+  --shadow-sm: 0 2px 8px rgba(120, 53, 15, 0.1), 0 1px 2px rgba(120, 53, 15, 0.06);
+  --shadow: 0 8px 24px rgba(120, 53, 15, 0.12), 0 2px 6px rgba(120, 53, 15, 0.08);
+  --shadow-lg: 0 24px 56px rgba(120, 53, 15, 0.2), 0 8px 16px rgba(120, 53, 15, 0.1);
+
+  --glass: rgba(255, 247, 237, 0.85);
+  --glass-soft: rgba(255, 247, 237, 0.72);
+  --scrim: rgba(67, 20, 7, 0.45);
+
+  --mesh:
+    radial-gradient(60% 60% at 15% 0%, rgba(251, 191, 36, 0.28), transparent 70%),
+    radial-gradient(55% 55% at 90% 10%, rgba(234, 88, 12, 0.18), transparent 70%),
+    radial-gradient(45% 45% at 40% 100%, rgba(249, 115, 22, 0.1), transparent 70%);
+}
+
+/* -------------------------------------------------- 14. Sakura Pastel ----- */
+[data-theme="sakura"] {
+  --bg: #fdf2f8;
+  --bg-soft: #fce7f3;
+  --surface: #ffffff;
+  --surface-2: #fce7f3;
+  --surface-3: #fbcfe8;
+  --border: #f9a8d4;
+  --border-soft: #fbcfe8;
+
+  --text: #701a45;
+  --text-dim: #9d3c6d;
+  --text-muted: #b1658d;
+
+  --accent: #ec4899;
+  --accent-soft: #f472b6;
+  --accent-dim: rgba(236, 72, 153, 0.14);
+  --accent-grad: linear-gradient(135deg, #ec4899, #c084fc);
+  --accent-glow: rgba(236, 72, 153, 0.28);
+
+  --ok: #16a34a;
+  --ok-dim: rgba(22, 163, 74, 0.12);
+  --warn: #d97706;
+  --warn-dim: rgba(245, 158, 11, 0.15);
+  --danger: #e11d48;
+  --danger-dim: rgba(225, 29, 72, 0.12);
+  --info: #8b5cf6;
+
+  --shadow-xs: 0 1px 2px rgba(131, 24, 67, 0.07);
+  --shadow-sm: 0 2px 8px rgba(131, 24, 67, 0.1), 0 1px 2px rgba(131, 24, 67, 0.05);
+  --shadow: 0 8px 24px rgba(131, 24, 67, 0.12), 0 2px 6px rgba(131, 24, 67, 0.07);
+  --shadow-lg: 0 24px 56px rgba(131, 24, 67, 0.18), 0 8px 16px rgba(131, 24, 67, 0.1);
+
+  --glass: rgba(253, 242, 248, 0.85);
+  --glass-soft: rgba(253, 242, 248, 0.72);
+  --scrim: rgba(131, 24, 67, 0.4);
+
+  --mesh:
+    radial-gradient(55% 55% at 20% 0%, rgba(244, 114, 182, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 85% 10%, rgba(192, 132, 252, 0.16), transparent 70%),
+    radial-gradient(45% 45% at 45% 100%, rgba(236, 72, 153, 0.08), transparent 70%);
+}
+
+/* -------------------------------------------------- 15. Retro Coffee ------ */
+[data-theme="retro"] {
+  --bg: #f5f0eb;
+  --bg-soft: #eee6db;
+  --surface: #faf7f4;
+  --surface-2: #ebe1d6;
+  --surface-3: #ded0be;
+  --border: #c3ac8e;
+  --border-soft: #dfd2c0;
+
+  --text: #3d2b1f;
+  --text-dim: #6b4f3a;
+  --text-muted: #846a55;
+
+  --accent: #7f5539;
+  --accent-soft: #a47148;
+  --accent-dim: rgba(127, 85, 57, 0.15);
+  --accent-grad: linear-gradient(135deg, #7f5539, #b08968);
+  --accent-glow: rgba(127, 85, 57, 0.28);
+
+  --ok: #4f774e;
+  --ok-dim: rgba(88, 129, 87, 0.14);
+  --warn: #b87e20;
+  --warn-dim: rgba(192, 138, 46, 0.16);
+  --danger: #a3372c;
+  --danger-dim: rgba(163, 55, 44, 0.14);
+  --info: #4a7a8c;
+
+  --shadow-xs: 0 1px 2px rgba(61, 43, 31, 0.08);
+  --shadow-sm: 0 2px 8px rgba(61, 43, 31, 0.12), 0 1px 2px rgba(61, 43, 31, 0.06);
+  --shadow: 0 8px 24px rgba(61, 43, 31, 0.14), 0 2px 6px rgba(61, 43, 31, 0.08);
+  --shadow-lg: 0 24px 56px rgba(61, 43, 31, 0.22), 0 8px 16px rgba(61, 43, 31, 0.12);
+
+  --glass: rgba(245, 240, 235, 0.86);
+  --glass-soft: rgba(245, 240, 235, 0.72);
+  --scrim: rgba(61, 43, 31, 0.45);
+
+  --mesh:
+    radial-gradient(55% 55% at 15% 0%, rgba(176, 137, 104, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 90% 12%, rgba(127, 85, 57, 0.14), transparent 70%),
+    radial-gradient(40% 40% at 45% 100%, rgba(88, 129, 87, 0.06), transparent 70%);
+}
+
+/* =================================== tinh chỉnh độ tương phản nền sáng === */
+[data-theme-scheme="light"] [data-app="chess"] {
+  --tile-bg: rgba(71, 85, 105, 0.14);
+  --tile-fg: #334155;
+}
+[data-theme-scheme="light"] .msg:hover {
+  background: rgba(15, 23, 42, 0.035);
+}
+[data-theme-scheme="light"] .theme-preview-frame {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+[data-theme-scheme="light"] .geo-hud,
+[data-theme-scheme="light"] .geo-map-card,
+[data-theme-scheme="light"] .geo-seats-card,
+[data-theme-scheme="light"] .geo-config-card,
+[data-theme-scheme="light"] .geo-score-row,
+[data-theme-scheme="light"] .geo-podium-row,
+[data-theme-scheme="light"] .geo-hist-item,
+[data-theme-scheme="light"] .geo-finish-card,
+[data-theme-scheme="light"] .geo-duel-hud {
+  background: var(--surface);
+  border-color: var(--border-soft);
+}
+[data-theme-scheme="light"] .geo-seat {
+  background: var(--surface-2);
+}
+[data-theme-scheme="light"] .geo-seat.empty {
+  border-color: var(--border);
+}
+
+/* ===================================================== chuyển mượt theme = */
+body::before { transition: background 0.25s ease; }
+body { transition: background-color 0.25s ease, color 0.25s ease; }

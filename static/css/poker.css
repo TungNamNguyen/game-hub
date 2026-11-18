@@ -1,0 +1,435 @@
+/* Xì Tố (static/js/views/poker.js) — bàn Texas Hold'em.
+ * Tách file riêng khỏi apps.css vì bàn poker có nhiều thành phần (ghế, chip
+ * cược, bảng hành động, hero) không dùng chung với game nào khác. */
+
+.pk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+  gap: 14px;
+  align-items: start;
+}
+/* Cột chính cao ĐÚNG bằng phần nhìn thấy của khung view (trừ topbar và padding
+   18px x 2 của .view). Bàn (.pk-felt) ăn phần còn lại sau banner và khu bài
+   của mình — nhờ vậy 2 lá tẩy và nút hành động LUÔN nằm trong màn hình, kể cả
+   laptop màn thấp hay trình duyệt đặt zoom 125-150%. Trước đây bàn có tỉ lệ
+   cố định nên trên màn thấp nó cao hơn cả màn hình và đẩy bài xuống dưới. */
+.pk-main {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  height: calc(100dvh - var(--topbar, 58px) - 36px);
+  min-height: 460px;
+}
+.pk-rail { gap: 12px; min-width: 0; }
+
+/* ---- thanh trạng thái ----------------------------------------------------- */
+.pk-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; min-height: 44px;
+  border-radius: var(--radius);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 14px; font-weight: 600;
+}
+.pk-banner.turn { border-color: var(--accent); background: var(--accent-dim); }
+.pk-banner.wait { color: var(--text-dim); }
+.pk-banner.won { border-color: var(--ok); background: var(--ok-dim); color: var(--ok); }
+.pk-banner.hot { border-color: var(--warn); background: var(--warn-dim); color: var(--warn); }
+.pk-count { font-family: var(--mono); }
+
+/* ---- bàn ----------------------------------------------------------------- */
+.pk-banner, .pk-hero { flex: none; }
+.pk-felt {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 220px;
+  /* Cho ghế/bài bên trong co theo KÍCH THƯỚC BÀN (xem @container ở cuối file)
+     chứ không theo kích thước cửa sổ — bàn có thể nhỏ vì cột chat bên cạnh. */
+  container-type: size;
+  container-name: felt;
+  border-radius: 28px;
+  background: radial-gradient(ellipse at 50% 30%, #1d1f2b 0%, #12141c 75%);
+  overflow: hidden;
+  user-select: none;
+}
+.pk-oval {
+  position: absolute; inset: 16% 9% 16%;
+  border-radius: 50% / 50%;
+  background: radial-gradient(ellipse at 50% 40%, #1f7a4d 0%, #135c39 55%, #0c4229 100%);
+  border: 14px solid #3d2516;
+  box-shadow: inset 0 0 0 3px rgba(255, 223, 128, 0.18),
+              inset 0 10px 40px rgba(0, 0, 0, 0.45),
+              0 14px 34px rgba(0, 0, 0, 0.55);
+}
+.pk-layer { position: absolute; inset: 0; pointer-events: none; }
+.pk-layer > * { pointer-events: auto; }
+
+/* ---- giữa bàn ------------------------------------------------------------ */
+.pk-center {
+  position: absolute; left: 50%; top: 47%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.pk-center-inner { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.pk-street {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pk-board { display: flex; gap: 6px; }
+.pk-pot, .pk-bet {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 750; font-family: var(--mono); color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+.pk-pot { padding: 4px 14px 4px 6px; font-size: 14px; }
+.pk-sidepots { display: flex; gap: 8px; font-size: 11.5px; color: rgba(255, 255, 255, 0.75); }
+.pk-chip {
+  width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(circle, #fde68a 0 32%, #d97706 34% 52%, #fde68a 54% 62%, #b45309 64%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.pk-bet {
+  position: absolute; transform: translate(-50%, -50%);
+  padding: 2px 9px 2px 3px; font-size: 12px; z-index: 2;
+}
+/* Chỉ chip VỪA đặt mới trượt vào — bàn vẽ lại liên tục, chạy hiệu ứng mỗi lần
+   vẽ thì chip nhảy liên hồi. */
+.pk-bet.fresh { animation: pk-slide 0.25s ease-out; }
+@keyframes pk-slide { from { opacity: 0; translate: 0 30%; } }
+
+.pk-result {
+  margin-top: 2px; padding: 7px 12px; max-width: 380px;
+  background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(253, 230, 138, 0.35);
+  border-radius: 10px; text-align: center; font-size: 12.5px; color: #fff;
+}
+.pk-result.fresh { animation: pk-pop 0.3s ease-out; }
+
+/* Chia 2 lần: hai dãy bài chung chồng lên nhau, có nhãn "Lần 1/2". */
+.pk-board-row { display: flex; align-items: center; gap: 6px; }
+.pk-run-tag {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.3px;
+  padding: 2px 6px; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55); color: #fde68a;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+}
+.pk-result-row strong { color: #fde68a; }
+.pk-result-hand { color: rgba(255, 255, 255, 0.75); }
+@keyframes pk-pop { from { transform: scale(0.85); opacity: 0; } }
+
+/* ---- lá bài -------------------------------------------------------------- */
+.pcard { display: block; border-radius: 6px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.pcard.slot { filter: none; }
+.pcard.dim { opacity: 0.45; }
+.pcard.hl { filter: drop-shadow(0 0 6px #fde047) drop-shadow(0 0 2px #fde047); transform: translateY(-4px); }
+
+/* ---- ghế ----------------------------------------------------------------- */
+.pk-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 128px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  z-index: 3;
+  transition: opacity 0.3s, filter 0.3s;
+}
+/* Ghế sát mép trên/dưới neo theo MÉP (xem SPOTS trong poker.js): bàn thấp
+   tới đâu thì ghế vẫn nằm trọn trong bàn, không bị cắt. */
+.pk-seat.at-top { transform: translate(-50%, 0); }
+.pk-seat.at-bottom { transform: translate(-50%, -100%); }
+.pk-seat.at-left { transform: translate(0, -50%); }
+.pk-seat.at-right { transform: translate(-100%, -50%); }
+.pk-face { position: relative; display: grid; place-items: center; }
+.pk-face .avatar.lg {
+  width: 52px; height: 52px; font-size: 17px;
+  border: 3px solid #2a2f3d; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.pk-seat.me .pk-face .avatar.lg { border-color: var(--accent-soft); }
+.pk-plate {
+  margin-top: -10px; padding: 9px 10px 4px; min-width: 112px;
+  text-align: center;
+  background: rgba(10, 12, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+.pk-name { font-size: 12.5px; font-weight: 650; max-width: 116px; margin: 0 auto; color: #fff; }
+.pk-stack { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: #fde68a; }
+.pk-seat.acting .pk-plate { border-color: var(--accent-soft); box-shadow: 0 0 18px rgba(99, 102, 241, 0.55); }
+.pk-seat.folded, .pk-seat.out { opacity: 0.55; filter: grayscale(0.7); }
+.pk-seat.offline .pk-face { filter: grayscale(1); }
+.pk-seat.winner .pk-plate { border-color: #fde047; box-shadow: 0 0 22px rgba(253, 224, 71, 0.6); }
+
+/* Vòng đếm giờ quanh avatar: --p chạy 1 -> 0. */
+.pk-timer {
+  position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(var(--ok) calc(var(--p, 1) * 360deg), rgba(255, 255, 255, 0.08) 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
+          mask: radial-gradient(circle, transparent 62%, #000 64%);
+}
+.pk-timer.low { background: conic-gradient(var(--danger) calc(var(--p, 1) * 360deg), rgba(255, 255, 255, 0.08) 0); }
+
+.pk-seat-cards { display: flex; margin-bottom: -18px; z-index: -1; }
+.pk-seat-cards .pcard + .pcard { margin-left: -12px; }
+.pk-seat-cards.shown { margin-bottom: -10px; z-index: 1; }
+
+.pk-dealer, .pk-pos {
+  position: absolute; top: 30px;
+  display: grid; place-items: center;
+  font-weight: 800; border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.pk-dealer { right: 6px; width: 22px; height: 22px; font-size: 11px; background: #fff; color: #111; }
+.pk-pos { left: 4px; width: 24px; height: 24px; font-size: 9.5px; background: #1e3a8a; color: #dbeafe; }
+
+/* ---- giải đấu: huy hiệu trên ghế ----------------------------------------- */
+.pk-host, .pk-crown {
+  position: absolute; top: 4px; left: 2px;
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; font-weight: 800;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.pk-host { background: #4338ca; color: #e0e7ff; }
+.pk-crown { background: #fde047; color: #111; }
+.pk-seat.eliminated { opacity: 0.5; filter: grayscale(0.85); }
+.pk-seat.eliminated .pk-stack { color: var(--text-muted); text-decoration: line-through; }
+.pk-seat.champion { opacity: 1; filter: none; }
+.pk-seat.champion .pk-plate {
+  border-color: #fde047; background: rgba(120, 90, 10, 0.85);
+  box-shadow: 0 0 26px rgba(253, 224, 71, 0.7);
+}
+
+.pk-tag {
+  font-size: 11px; font-weight: 750; padding: 1px 8px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6); color: #e5e7eb; white-space: nowrap;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+}
+.pk-tag.tone-check, .pk-tag.tone-call { background: #155e75; color: #cffafe; }
+.pk-tag.tone-bet, .pk-tag.tone-raise { background: #9a3412; color: #ffedd5; }
+.pk-tag.tone-allin { background: #b91c1c; color: #fff; }
+.pk-tag.tone-fold { background: #374151; color: #9ca3af; }
+.pk-tag.tone-win { background: #ca8a04; color: #111; font-size: 12px; }
+
+.pk-seat.empty .pk-empty-ring {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.25); color: rgba(255, 255, 255, 0.4);
+}
+
+/* Bong bóng chat / cà khịa trên đầu ghế. Hiệu ứng bật lên CHỈ ở lớp .fresh
+   (lần đầu tin xuất hiện) — bàn vẽ lại liên tục, nếu lần nào cũng bật thì nhìn
+   như tin bị gửi lặp lại. Ghế sát mép trên thì bong bóng hiện BÊN DƯỚI ghế. */
+.pk-bubble {
+  position: absolute; bottom: calc(100% + 4px); left: 50%;
+  transform: translateX(-50%);
+  max-width: 200px; width: max-content;
+  padding: 6px 11px; border-radius: 12px;
+  background: #fff; color: #111827;
+  font-size: 13px; font-weight: 650; text-align: center;
+  overflow-wrap: anywhere; pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  z-index: 8;
+}
+.pk-bubble.fresh { animation: pk-bubble 0.25s ease-out; }
+.pk-bubble.taunt { background: #fde68a; }
+.pk-bubble::after {
+  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: #fff;
+}
+.pk-bubble.taunt::after { border-top-color: #fde68a; }
+.pk-seat.at-top .pk-bubble { bottom: auto; top: calc(100% + 4px); }
+.pk-seat.at-top .pk-bubble::after {
+  top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #fff;
+}
+.pk-seat.at-top .pk-bubble.taunt::after { border-bottom-color: #fde68a; }
+/* Dùng thuộc tính `scale` riêng để không đè lên `transform` định vị ở trên. */
+@keyframes pk-bubble { from { scale: 0.6; opacity: 0; } }
+
+/* ---- hero: bài của mình + bảng hành động ---------------------------------- */
+.pk-hero {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px; align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg, 14px);
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.pk-hero-left { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 190px; }
+.pk-hero-cards { display: flex; gap: 6px; min-height: 120px; align-items: center; }
+.pk-hero-cards .pcard { transform: rotate(var(--tilt, 0deg)); transition: transform 0.2s; }
+.pk-hero-cards .pcard.hl { transform: rotate(var(--tilt, 0deg)) translateY(-6px); }
+.pk-hero-label { font-weight: 750; font-size: 14px; color: var(--accent-soft); min-height: 20px; text-align: center; }
+.pk-hero-info { display: flex; gap: 8px; align-items: center; }
+.pk-hero-chips { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-weight: 700; }
+.pk-hero-empty { max-width: 220px; font-size: 13px; color: var(--text-dim); text-align: center; }
+
+.pk-actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pk-turn { display: flex; flex-direction: column; gap: 8px; }
+.pk-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.pk-sizer { display: flex; gap: 8px; align-items: center; }
+.pk-slider { flex: 1; min-width: 80px; accent-color: var(--accent); }
+.pk-amount { width: 120px; font-family: var(--mono); font-weight: 700; text-align: right; }
+.pk-main-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.pk-btn {
+  position: relative;
+  padding: 13px 10px; font-size: 15px; font-weight: 800;
+  border-radius: 10px; border: 1px solid transparent; color: #fff;
+}
+.pk-btn kbd {
+  position: absolute; top: 3px; right: 6px;
+  font-size: 9.5px; font-family: var(--mono); opacity: 0.6; font-weight: 600;
+}
+.pk-btn.fold { background: #4b5563; }
+.pk-btn.fold:hover { background: #6b7280; }
+.pk-btn.call { background: #0e7490; }
+.pk-btn.call:hover { background: #0891b2; }
+.pk-btn.raise { background: #c2410c; }
+.pk-btn.raise:hover { background: #ea580c; }
+.pk-btn.raise.allin { background: #b91c1c; }
+.pk-btn.raise::after { content: "R"; position: absolute; top: 3px; right: 6px; font-size: 9.5px; opacity: 0.6; font-family: var(--mono); }
+
+.pk-pre { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pk-pre-opt {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 650;
+  background: var(--surface-3); border: 1px solid var(--border);
+}
+.pk-pre-opt { white-space: nowrap; }
+/* Ô nhập chung của app là width:100% — checkbox ở đây phải về cỡ tự nhiên. */
+.pk-pre-opt input { width: auto; margin: 0; accent-color: var(--accent); }
+.pk-pre-opt.on { border-color: var(--accent); background: var(--accent-dim); }
+.pk-wait { font-size: 13px; color: var(--text-dim); }
+.pk-rit, .pk-show { display: flex; flex-direction: column; gap: 8px; }
+.pk-rit {
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--warn); background: var(--warn-dim);
+}
+.pk-rit-title { font-size: 16px; font-weight: 800; color: var(--warn); }
+.pk-show .pk-btn { max-width: 320px; }
+.pk-util { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+
+/* ---- giải đấu: bảng điều khiển dưới bàn ---------------------------------- */
+.pk-tourney { display: flex; flex-direction: column; gap: 8px; }
+.pk-tourney-head { font-size: 15px; font-weight: 800; color: #e5e7eb; }
+.pk-tourney-head.win { color: #fde047; }
+.pk-tourney-head.out { color: var(--danger); }
+.pk-util .danger { color: var(--danger); }
+
+/* ---- cột phải ------------------------------------------------------------- */
+.pk-leader { gap: 6px; }
+.pk-leader-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+.pk-leader-row.top { font-weight: 700; }
+.pk-rank { width: 24px; text-align: center; font-size: 12px; color: var(--text-muted); }
+.pk-leader-row.top .pk-rank { font-size: 16px; }
+/* ---- giải đấu: bảng hạng ở cột phải -------------------------------------- */
+.pk-tour-card { gap: 5px; }
+.pk-tour-row {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0;
+}
+.pk-tour-row strong { font-family: var(--mono); color: #fde68a; }
+.pk-tour-row.top { font-weight: 700; }
+.pk-tour-row.out { opacity: 0.6; }
+.pk-tour-row.out .pk-rank { text-decoration: line-through; }
+
+.pk-plus { color: var(--ok); font-family: var(--mono); }
+.pk-minus { color: var(--danger); font-family: var(--mono); }
+.pk-quick-emoji { display: flex; flex-wrap: wrap; gap: 2px; }
+/* Popup cà khịa. Hai lỗi cũ: .emoji-pop giới hạn cao 240px nên trong cột flex
+   các nút bị CO dẹt lại; và nút chung của app là nowrap + overflow:hidden nên
+   chữ bị cắt mất nửa trên. Ở đây: nút không co (flex none), chữ được xuống
+   dòng, popup tự cuộn khi dài. */
+.emoji-pop.pk-taunts {
+  width: 270px; max-height: 320px;
+  display: flex; flex-direction: column; gap: 4px; padding: 8px;
+}
+.emoji-pop.pk-taunts.hidden { display: none; }
+.pk-taunt {
+  flex: none;
+  text-align: left; font-size: 13px; line-height: 1.35; font-weight: 600;
+  padding: 7px 10px; border-radius: 8px;
+  white-space: normal; overflow: visible; text-overflow: clip;
+  background: var(--surface-3); border: 1px solid var(--border);
+}
+.pk-taunt:hover { border-color: var(--accent-soft); background: var(--accent-dim); }
+.pk-chat-taunt { color: #fbbf24; font-style: italic; }
+
+/* ---- co giãn theo KÍCH THƯỚC BÀN ------------------------------------------ */
+/* Bàn thấp (laptop màn thấp, zoom 125%+): thu nhỏ ghế, bài, avatar. */
+@container felt (max-height: 470px) {
+  .pk-seat { width: 108px; gap: 2px; }
+  .pk-face .avatar.lg { width: 40px; height: 40px; font-size: 14px; border-width: 2px; }
+  .pk-plate { min-width: 96px; margin-top: -8px; padding: 7px 7px 3px; }
+  .pk-name { font-size: 11.5px; max-width: 98px; }
+  .pk-stack { font-size: 11.5px; }
+  .pk-seat-cards .pcard { width: 26px; height: 36px; }
+  .pk-seat-cards { margin-bottom: -14px; }
+  .pk-seat-cards.shown .pcard { width: 32px; height: 45px; }
+  .pk-board .pcard { width: 48px; height: 67px; }
+  .pk-dealer, .pk-pos { top: 20px; }
+  .pk-tag { font-size: 10.5px; }
+}
+/* Bàn rất thấp: chỉ giữ thứ thiết yếu. */
+@container felt (max-height: 360px) {
+  .pk-seat { width: 96px; }
+  .pk-face .avatar.lg { width: 32px; height: 32px; font-size: 12px; }
+  .pk-plate { min-width: 86px; padding: 6px 5px 2px; }
+  .pk-seat-cards:not(.shown) { display: none; }
+  .pk-board .pcard { width: 40px; height: 56px; }
+  .pk-street { display: none; }
+  .pk-dealer, .pk-pos { top: 12px; width: 18px; height: 18px; font-size: 9px; }
+}
+/* Bàn hẹp (điện thoại, cửa sổ chia đôi). */
+@container felt (max-width: 620px) {
+  .pk-seat { width: 88px; }
+  .pk-plate { min-width: 80px; }
+  .pk-name { max-width: 78px; }
+  .pk-board { gap: 3px; }
+  .pk-board .pcard { width: 38px; height: 53px; }
+  .pk-bet { font-size: 11px; }
+}
+@container felt (max-width: 440px) {
+  .pk-seat { width: 76px; gap: 2px; }
+  .pk-face .avatar.lg { width: 34px; height: 34px; font-size: 12px; border-width: 2px; }
+  .pk-plate { min-width: 70px; margin-top: -7px; padding: 5px 4px 2px; }
+  .pk-name { font-size: 10.5px; max-width: 68px; }
+  .pk-stack { font-size: 10.5px; }
+  .pk-seat-cards:not(.shown) { display: none; }
+  .pk-board .pcard { width: 34px; height: 48px; }
+  .pk-pot { padding: 3px 10px 3px 5px; font-size: 12px; }
+}
+
+/* ---- khu bài của mình trên màn thấp ---------------------------------------- */
+@media (max-height: 820px) {
+  .pk-hero { padding: 8px 12px; gap: 12px; }
+  .pk-hero-cards { min-height: 0; }
+  .pk-hero-cards .pcard { width: 62px; height: 87px; }
+  .pk-hero-left { min-width: 150px; gap: 3px; }
+  .pk-hero-label { font-size: 13px; min-height: 0; }
+  .pk-btn { padding: 10px 8px; font-size: 14px; }
+  .pk-turn, .pk-actions { gap: 6px; }
+}
+
+/* ---- màn hẹp ---------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  /* minmax(0, …) chứ không phải 1fr: 1fr không cho cột co nhỏ hơn nội dung,
+     nên trên điện thoại cả bàn lẫn nút hành động bị tràn ra ngoài màn. */
+  .pk-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  /* Điện thoại dọc: bàn vuông, khu bài + nút DÍNH ở đáy màn hình để luôn thấy
+     bài của mình trong lúc cuộn xem bàn. */
+  .pk-main { height: auto; min-height: 0; }
+  .pk-felt { flex: none; aspect-ratio: 1 / 1.08; min-height: 330px; }
+  .pk-oval { inset: 15% 5% 15%; }
+  .pk-hero {
+    grid-template-columns: 1fr; gap: 8px;
+    position: sticky; bottom: 0; z-index: 10;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.45);
+  }
+  .pk-hero-left { flex-direction: row; justify-content: center; min-width: 0; gap: 10px; }
+  .pk-hero-cards .pcard { width: 52px; height: 73px; }
+  .pk-hero-info { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .pk-main-btns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pk-btn { padding: 10px 4px; font-size: 13px; }
+  .pk-btn kbd, .pk-btn.raise::after { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-bet.fresh, .pk-result.fresh, .pk-bubble.fresh { animation: none !important; }
+}
