@@ -1,13 +1,3 @@
----
-title: Game Hub
-emoji: 🎮
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # 🎮 Game Hub — Real-Time Multiplayer Gaming & Social Platform
 
 A modern, lightweight, full-stack web platform for **real-time multiplayer games, group chat, and custom avatars**, built with **FastAPI**, **WebSockets + SSE/Long-Polling fallback**, **PostgreSQL / JSON storage**, and **Vanilla ES6 Modules** (zero frontend build step required).
