@@ -131,22 +131,37 @@ function mountRoom(root, ctx, code) {
       if (movesFrom(selected).includes(index)) {
         const from = selected;
         selected = -1;
+        // Optimistic UI: di chuyển quân ngay trên bàn (0ms)
+        if (state && state.board) {
+          state.board[index] = state.board[from];
+          state.board[from] = '';
+          state.lastMove = [from, index];
+          state.turn = state.you.mark === 'X' ? 'O' : 'X';
+          state.legal = {};
+          sfx.move();
+          renderBoard();
+          const info = statusText(state);
+          statusBar.textContent = info.text;
+          statusBar.className = 'status-bar ' + info.cls;
+        }
         net.send(CHANNEL, 'move', { from, to: index });
         return;
       }
-      if (index === selected) { selected = -1; render(); return; }
+      if (index === selected) { selected = -1; renderBoard(); return; }
     }
     if (movesFrom(index).length) {
       selected = index;
-      render();
+      renderBoard();
       return;
     }
     const piece = state.board[index];
     if (piece && piece[0] === state.colorOf[state.you.mark]) {
       toast(t('chess.noMovesPiece'));
     }
-    selected = -1;
-    render();
+    if (selected >= 0) {
+      selected = -1;
+      renderBoard();
+    }
   }
 
   /* ---------------------------------------------------------- vẽ bàn ----- */
