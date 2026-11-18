@@ -8,175 +8,150 @@ app_port: 7860
 pinned: false
 ---
 
-# 🎮 Game Hub — Real-Time Multiplayer Gaming & Chat Platform
+# 🎮 Game Hub — Real-Time Multiplayer Gaming & Social Platform
 
-A modern, lightweight, full-featured web platform for real-time multiplayer board & party games, featuring built-in AI bots, dynamic lobbies, global chat, custom avatars, and full bilingual support (English / Vietnamese).
+A modern, lightweight, full-stack web platform for **real-time multiplayer games, group chat, and custom avatars**, built with **FastAPI**, **WebSockets + SSE/Long-Polling fallback**, **PostgreSQL / JSON storage**, and **Vanilla ES6 Modules** (zero frontend build step required).
 
-Built with **FastAPI**, **WebSockets**, **PostgreSQL / SQLite**, and vanilla **Modern ES6 JavaScript** (zero heavy frontend build toolchains required).
+Supports instant play without account registration, **16 dark/light themes**, **full Vietnamese / English (VI/EN) localization**, **desktop & mobile responsive layouts**, and **AI bots** across 7 game modes.
 
 ---
 
-## 🌟 Featured Games
+## 🌟 Games & Apps
 
 ### 🌍 1. GeoGuessr (Địa Đồ)
-- **8 Map Regions**: **World**, **Vietnam**, **Asia**, **Europe**, **North America**, **South America**, **Africa**, and **Oceania**.
-- **2 Focused Game Modes**:
-  - **Global (100% Real-Time Street View)**: Unlimited worldwide locations powered by multi-threaded Google Street View RPC pre-warming (0ms round start).
-  - **Landmarks**: Curated collection of 400+ authentic iconic landmarks, UNESCO sites, and regional monuments across all 63 provinces of Vietnam and 6 continents.
-- **Multiple Formats & Rules**:
-  - *Formats*: Classic 5-Round, Streak Mode (Country / Vietnam Province), and Team/Boss Survival Duels.
-  - *Movement Rules*: **Moving**, **No Move (NM)** with 360° pan/zoom, and **NMPZ** (No Move, Pan, Zoom).
-- **Detailed Round Analytics**: Accurate distance calculation (Haversine), cardinal direction offsets, keyboard shortcuts (`Space`, `R`, `M`), and one-click Google Maps links.
+- **8 Map Regions**: **World**, **Vietnam (63 provinces)**, **Asia**, **Europe**, **North America**, **South America**, **Africa**, and **Oceania**.
+- **2 Modes**:
+  - **Global (100% Street View)**: Real-time worldwide Google Street View with background RAM pre-warming (`0ms` round start) and strict ISO country-code boundary validation.
+  - **Landmarks**: Curated & verified collection of **1,600+ official 22-character `pano` ID** locations across all regions (zero black screens).
+- **3 Formats & 3 Rules**: Classic 5-Round, Country/Province Streak, and Team/Boss Survival Duels (`6,000` / `12,000` HP); **Moving**, **No Move (NM)**, and **NMPZ**.
 
-### 🃏 2. Liar's Deck (Sòng Bịp)
-- Inspired by the intense bluffing card game for 2–4 players.
-- **Devil Mode (Ma Vương)** & Custom Chambers: Tension-filled Colt Python .357 Russian roulette mechanics with realistic sound & recoil animations.
-- **Sequential Dramatic Card Reveal**: Cards flip one by one when a bluff is called ("BỊP! / LIAR!").
-- **Quick Taunt Bubbles**: Send in-game reaction taunts during opponents' turns.
-- **Smart AI Bots**: Built-in bluffing bots with diverse risk profiles.
+### 🏳️ 2. Flags & Capitals (Đố Cờ & Thủ Đô)
+- **197 Countries & Territories** filtered by **World**, **Asia**, **Europe**, **Americas**, **Africa**, or **Oceania**.
+- **3 Quiz Types**: Flag → Country, Country → Capital, or Mixed.
+- **2 Answer Modes**:
+  - **Multiple Choice (A/B/C/D)**: Continent-aware distractors with keyboard hotkeys `1`–`4`.
+  - **Type Answer**: Accent-insensitive VI/EN/alias matching (e.g. `viet nam` / `Việt Nam`, `ha noi` / `Hanoi`, `USA` / `Mỹ`), 1-typo tolerance, and quick autocomplete suggestions.
+- **Multiplayer & AI Bots**: 1–6 players with speed + streak scoring and 3 AI bot difficulty levels.
 
-### ♠️ 3. Texas Hold'em Poker (Xì Tố)
-- Standard No-Limit Texas Hold'em rules with Pot-Limit / No-Limit betting rounds.
-- **AI Poker Bots**: Support single-player games with bots featuring distinct playing styles (Tight-Passive, Aggressive, Bluffer).
-- **Daily Leaderboard**: Track daily champions and chips.
+### 🃏 3. Liar's Deck (Sòng Bịp)
+- 2–4 player bluffing card game with **Devil Mode (Ma Vương)**, Colt Python .357 Russian roulette animations & sound effects, quick taunt bubbles, synced player avatars, and AI bots.
 
-### ♟️ 4. Classic Strategy & Board Games
-- **Gomoku / Caro (Cờ Caro)**: Support standard & large grids (15×15, 20×20, 35×35, 50×50) with optimized incremental DOM rendering and Minimax AI bot.
-- **Chess (Cờ Vua)**: Full FIDE rules (castling, en passant, promotion), timer chess clocks, undo/draw offers, and multi-difficulty AI bot.
-- **Xiangqi (Cờ Tướng)**: Complete Chinese Chess rules, board visualization, clocks, and Alpha-Beta pruning bot.
-- **Battleship (Bắn Tàu)**: Classic 10×10 naval combat with radar feedback and smart targeting AI bot.
+### ♠️ 4. Texas Hold'em Poker (Xì Tố)
+- 2–6 players **Cash** & **Knockout Tournament** tables, **Run It Twice**, pre-actions, daily profit leaderboard, and AI bots with distinct playstyles.
+
+### ♟️ 5. Classic Strategy & Board Games
+- **Gomoku / Caro**: 3×3 XO up to 50×50 grids with incremental DOM updates and AI bot.
+- **Chess (Cờ Vua)**: Full FIDE rules (castling, en passant, promotion, draws), chess clocks, and AI bot.
+- **Xiangqi (Cờ Tướng)**: 9×10 Chinese Chess with full piece rules, clocks, and Alpha-Beta AI bot.
+- **Battleship (Bắn Tàu)**: 10×10 naval combat with auto-place and smart targeting AI bot.
 
 ---
 
-## 🚀 Key Platform Features
+## 🚀 Platform Highlights
 
-- **🌐 Full Bilingual Support (i18n)**: One-click instant switching between **English (EN)** and **Vietnamese (VI)** without refreshing or dropping active WebSocket rooms.
-- **⚡ Real-Time WebSocket Infrastructure**: Instant state synchronization, automatic reconnection, sub-millisecond game state updates.
-- **🤖 Dedicated AI Bot Engine**: Non-blocking bot evaluation offloaded to asynchronous background thread pools to prevent event loop starvation.
-- **💬 Real-Time Chat & Social**:
-  - Global lobby chat and dedicated per-room game chat with preserved input buffers during re-renders.
-  - Image attachments, custom emoji pickers, and quick reactions.
-- **🎭 Procedural Vector Avatar Generator**: Built-in interactive SVG avatar studio (gender, hairstyles, facial hair, skin tones, eyewear, clothing, accessories).
-- **🔒 Secure Anonymous Sessions**: Frictionless instant play without mandatory account registration; protected via client-bound session tokens to prevent UID spoofing.
+- **🛡️ 3-Tier Real-Time Transport (`WebSocket → SSE → HTTP Long-Polling`)**: Automatically falls back to Server-Sent Events or HTTP Long-Polling when corporate firewalls or proxies block WebSocket upgrades.
+- **💬 Real-Time Group Chat**:
+  - Multi-channel chat with unread badges, replies, typing indicators, and desktop notifications.
+  - **Image uploads** (auto-resized client-side) & **file attachments up to 15 MB** (drag-and-drop, paste, safe `attachment` downloads).
+  - **380+ Emojis**, **20 Kaomoji**, persistent **Recent** history, and **24 message reactions**.
+- **🎨 16 Themes & Polished UI**: 10 Dark + 6 Light themes with `"Match system"`, `Alt + T` quick cycling, custom glassmorphism dropdowns, and collapsible desktop sidebar.
+- **🎭 Avatar Studio**: Procedural SVG/PNG avatar generator (8 quick presets + 4 customizer tabs) synced across chat and all game rooms, plus distinct **Robot SVG avatars** for AI bots.
+- **🌐 Bilingual (VI / EN) & Mobile-First**: Instant language switching without dropping rooms, plus responsive touch layouts for mobile browsers.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Backend**: Python 3.12, [FastAPI](https://fastapi.tiangolo.com/), [Uvicorn](https://www.uvicorn.org/), [WebSockets](https://websockets.readthedocs.io/), [Pillow](https://python-pillow.org/), [psycopg3](https://www.psycopg.org/)
-- **Frontend**: Vanilla Modern JavaScript (ES Modules), CSS3 Variables / Flexbox / Grid, HTML5 Canvas / SVG, Leaflet.js (for map guesses)
-- **Database**: PostgreSQL (Production / Render / Supabase) with automatic SQLite fallback for local development
-- **Deployment**: Docker, Hugging Face Spaces, Render, or self-hosted VPS
+- **Frontend**: Vanilla ES6 Modules, CSS Variables / Grid / Flexbox, SVG, [Leaflet](https://leafletjs.com/)
+- **Storage**: PostgreSQL (optional via `DATABASE_URL`) or local JSON + filesystem (`data/`)
+- **Edge Proxy (Optional)**: Cloudflare Pages `_worker.js` (`cf-pages/_worker.js`)
 
 ---
 
 ## 📂 Repository Structure
 
 ```text
-├── server.py              # Main ASGI application entrypoint & HTTP routes
-├── hub.py                 # Core WebSocket Hub, client directory & state sync
-├── games.py               # Game room orchestration and lobby handlers
-├── db.py                  # Database abstraction (PostgreSQL / SQLite)
+├── server.py                  # FastAPI ASGI app, HTTP/WS/SSE/Long-Polling & upload routes
+├── hub.py                     # Central WebSocket/RT Hub, presence & room orchestration
+├── games.py                   # Base SeatedRoom / GameRoom & RoomManager
+├── db.py                      # PostgreSQL schema & connection pool (optional)
 │
-├── geoguessr.py           # GeoGuessr game logic & Street View coordinate service
-├── bluff.py               # Liar's Deck logic & Russian roulette resolution
-├── poker.py               # Texas Hold'em game state engine
-├── poker_hand.py          # 7-card poker hand evaluation & ranking
-├── chessgame.py           # Chess engine & move validation
-├── xiangqi.py             # Xiangqi (Chinese Chess) rules & engine
-├── caro.py                # Gomoku / Caro board logic
-├── battleship.py          # Battleship grid & hit detection
+├── geoguessr.py               # GeoGuessr engine & verified Street View RPC service
+├── flags_quiz.py              # Flags & Capitals quiz engine + smart text matcher
+├── bluff.py                   # Liar's Deck engine & revolver mechanics
+├── poker.py / poker_hand.py   # Texas Hold'em engine & 7-card evaluator
+├── chessgame.py / xiangqi.py  # Chess & Xiangqi rules engines
+├── caro.py / battleship.py    # Caro & Battleship engines
+├── bot_*.py / bots.py         # Non-blocking AI bot engines & registry
+├── chat.py / avatar.py        # Chat history, file/image uploads & avatar store
 │
-├── bot_*.py               # AI Bots (bot_chess, bot_xiangqi, bot_poker, bot_bluff, bot_caro, bot_ship)
-├── avatar.py              # Procedural SVG avatar rendering engine
-├── chat.py                # Chat history, storage & broadcast manager
-│
-├── assets/                # Static datasets (e.g. geo_locations.json)
-├── static/                # Frontend web application
-│   ├── index.html         # Single Page Application container
-│   ├── css/               # Modular stylesheet rules & responsive layouts
-│   └── js/                # Client-side scripts
-│       ├── i18n.js        # Bilingual dictionary & locale switcher (EN/VI)
-│       └── views/         # Per-game client view controllers
-├── tests/                 # Automated test suite (pytest)
-├── docs/                  # Technical documentation & game specifications
-└── requirements.txt       # Python dependencies
+├── assets/
+│   ├── countries_quiz.json    # 197 countries & capitals bilingual dataset
+│   └── geo_locations.json     # Verified 22-char Street View pano datasets
+├── cf-pages/_worker.js        # Cloudflare Pages reverse proxy (reads env.BACKEND_HOST)
+├── static/
+│   ├── index.html             # SPA shell & anti-FOUC theme bootstrap
+│   ├── css/                   # app.css, apps.css, poker.css, themes.css
+│   └── js/                    # dom.js, net.js, ui.js, i18n.js, themes.js, emoji.js, views/
+└── tests/                     # Automated test suite
 ```
 
 ---
 
 ## 💻 Getting Started
 
-### Prerequisites
-- Python 3.11 or 3.12+
-- Git
-
-### 1. Clone the repository
+### 1. Clone & install dependencies
 ```bash
 git clone https://github.com/TungNamNguyen/game-hub.git
 cd game-hub
-```
-
-### 2. Create a virtual environment & install dependencies
-```bash
 python3 -m venv .venv
-source .venv/bin/activate       # On Windows: .venv\Scripts\activate
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Run the development server
+### 2. Run locally
 ```bash
 python server.py
-# Or using uvicorn directly:
-uvicorn server:app --host 0.0.0.0 --port 7860 --reload
+# Or with auto-reload:
+uvicorn server:app --host 0.0.0.0 --port 8780 --reload
 ```
-Open [http://localhost:7860](http://localhost:7860) in your browser.
+Open [http://127.0.0.1:8780](http://127.0.0.1:8780) in your browser.
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Verification & Tests
 
-Run the comprehensive test suite covering game engines, AI bot decisions, and hand evaluators:
 ```bash
+# Python unit tests
 python -m unittest discover -s tests -p "test_*.py"
-```
 
-Verify frontend syntax and internationalization parity:
-```bash
-for f in $(find static/js -name '*.js'); do node --check "$f"; done
+# Python & JavaScript syntax checks
+python -m py_compile *.py
+for f in $(find static/js -name '*.js'); do node --check "$f" || exit 1; done
 ```
 
 ---
 
-## 🐳 Docker & Multi-Platform Free Deployment
-
-You can build and run the application locally using Docker:
+## 🐳 Docker & Deployment
 
 ```bash
 docker build -t game-hub .
-docker run -p 7860:7860 game-hub
+docker run -p 7860:7860 -e PORT=7860 game-hub
 ```
 
-### Parallel Free Hosting Options (Bypass Corporate Firewalls)
-This repository supports zero-config parallel deployment on multiple free platforms simultaneously:
-- **Koyeb** *(Free Tier — `*.koyeb.app`)*: Connect this GitHub repo directly using the root `Dockerfile` with `PORT=7860` and HTTP health check `/healthz`.
-- **Render** *(uses `render.yaml`)*: Connect this GitHub repo directly as a Docker Web Service.
-- **Google Cloud Run** *(Free Tier — `*.run.app`)*: Deploy the `Dockerfile` directly with `PORT=7860`.
-- **Shared State**: Point `DATABASE_URL` across all instances to a single free PostgreSQL database (Supabase / Neon) to sync profiles, chat, and leaderboards.
-
----
-
-## ⚙️ Environment Variables
+### Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `7860` | Server listening port |
-| `DATABASE_URL` | *None* | PostgreSQL connection string (falls back to local SQLite if omitted) |
-| `BOT_CONCURRENCY` | `1` | Max concurrent AI bot calculations |
-| `BOT_BUDGET_SCALE` | `0.5` | Bot search depth & time budget multiplier for constrained CPU environments |
+| `PORT` | `8780` (`7860` in Docker) | HTTP/WebSocket listening port |
+| `DATABASE_URL` | *None* | Optional PostgreSQL connection string (falls back to `data/` JSON if unset) |
+| `BOT_CONCURRENCY` | `2` | Max concurrent AI bot evaluations |
+| `BACKEND_HOST` | *Required on CF Pages* | Backend hostname configured in Cloudflare Pages **Variables & Secrets** for `cf-pages/_worker.js` |
+| `RENDER_URL` | *Optional Secret* | GitHub Actions secret for `.github/workflows/keepalive.yml` |
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License. Feel free to use, modify, and contribute!
+Distributed under the MIT License.
