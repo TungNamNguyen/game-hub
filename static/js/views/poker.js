@@ -616,7 +616,12 @@ function mountRoom(root, ctx, code) {
     const box = h('div', { class: 'pk-turn' });
     if (!raiseTo || raiseTo < a.minTo || raiseTo > a.maxTo) raiseTo = a.minTo;
 
-    const send = (tKind, extra) => { net.send(CHANNEL, tKind, extra); pre = ''; };
+    const send = (tKind, extra) => {
+      sfx.move();
+      for (const b of box.querySelectorAll('button')) b.disabled = true;
+      net.send(CHANNEL, tKind, extra);
+      pre = '';
+    };
     const verb = a.isBet ? t('poker.betVerb') : t('poker.raiseVerb');
 
     if (a.canRaise) {
@@ -717,7 +722,7 @@ function mountRoom(root, ctx, code) {
     pre = '';
     if (!actType) return;
     autoSentKey = key;
-    setTimeout(() => net.send(CHANNEL, actType), 300);
+    setTimeout(() => net.send(CHANNEL, actType), 60);
   }
 
   /* ----------------------------------------------------------- phím tắt -- */
@@ -728,10 +733,11 @@ function mountRoom(root, ctx, code) {
     if (tag === 'TEXTAREA') return;
     const a = state.act;
     const k = e.key.toLowerCase();
-    if (k === 'f') net.send(CHANNEL, 'fold');
-    else if (k === 'c') net.send(CHANNEL, a.canCheck ? 'check' : 'call');
-    else if (k === 'r' && a.canRaise) net.send(CHANNEL, 'raise', { amount: raiseTo || a.minTo });
+    if (k === 'f') { sfx.move(); net.send(CHANNEL, 'fold'); }
+    else if (k === 'c') { sfx.move(); net.send(CHANNEL, a.canCheck ? 'check' : 'call'); }
+    else if (k === 'r' && a.canRaise) { sfx.move(); net.send(CHANNEL, 'raise', { amount: raiseTo || a.minTo }); }
     else return;
+    state.act = null;
     e.preventDefault();
   }
   document.addEventListener('keydown', onKey);
@@ -912,7 +918,9 @@ function mountRoom(root, ctx, code) {
   }
   renderLeaderboard([]);
   loadLeaderboard();
-  const boardTimer = setInterval(loadLeaderboard, 12000);
+  const boardTimer = setInterval(() => {
+    if (!document.hidden) loadLeaderboard();
+  }, 12000);
 
   /* ------------------------------------------------------- chat + cà khịa */
   function buildChat() {
