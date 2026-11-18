@@ -348,6 +348,7 @@ def _registry() -> dict[str, type[Bot]]:
     from bot_caro import CaroBot
     from bot_chess import ChessBot
     from bot_flags import FlagsBot
+    from bot_ludo import LudoBot
     from bot_poker import PokerBot
     from bot_ship import ShipBot
     from bot_xiangqi import XiangqiBot
@@ -360,6 +361,7 @@ def _registry() -> dict[str, type[Bot]]:
         BluffBot.CHANNEL: BluffBot,
         PokerBot.CHANNEL: PokerBot,
         FlagsBot.CHANNEL: FlagsBot,
+        LudoBot.CHANNEL: LudoBot,
     }
 
 
