@@ -178,3 +178,112 @@ def test_zombie_ai_survivor_bots_and_solo_mode():
     for _ in range(20):
         room.tick(dt_override=0.066)
     assert room.total_kills > kills_before
+
+
+def test_zombie_six_players_and_rematch_monotonic_events():
+    room = ZombieRoom("Z6P1", "outpost")
+    room.join("u1", "Leader", "#38bdf8")
+    for idx in range(2, 7):
+        room.handle("u1", "add_bot", {"mark": str(idx), "level": "normal"})
+    assert len(room._seated_marks()) == 6
+    assert len(room.bot_players()) == 5
+
+    room.handle("u1", "start", {})
+    assert len(room.survivors) == 6
+    v1 = room.match_view("u1")
+    assert v1["matchId"] == 1
+    assert v1["maxSeats"] == 6
+
+    # Bắn vài phát ở ván 1 để đẩy _event_seq lên cao
+    room.handle("u1", "shoot", {"aim": 0.0})
+    seq_v1 = room.events[-1]["seq"]
+    assert seq_v1 >= 2
+
+    # Kết thúc ván 1 và bấm Chơi ván mới (Rematch)
+    room.resign("u1")
+    assert room.status == "finished"
+    for p in room.bot_players():
+        room.vote_rematch(p.uid)
+    room.vote_rematch("u1")
+
+    assert room.status == "playing"
+    v2 = room.match_view("u1")
+    assert v2["matchId"] == 2
+    assert len(room.hazards) == 0
+    assert len(room.telegraphs) == 0
+
+    # Bắn ở ván 2 -> seq PHẢI lớn hơn seq_v1 để client không bao giờ lọc bỏ tia đạn!
+    room.handle("u1", "shoot", {"aim": 0.0})
+    shot_evs = [e for e in room.events if e["t"] == "shot"]
+    assert shot_evs
+    assert shot_evs[-1]["seq"] > seq_v1
+
+
+def test_zombie_shop_upgrades_launcher_and_items():
+    room = ZombieRoom("ZSHP", "lab")
+    room.join("u1", "Gunsmith", "#38bdf8")
+    room.handle("u1", "start", {})
+    sv = room.survivors["1"]
+    sv["money"] = 6000
+    sv["x"], sv["y"] = 500.0, 450.0
+    room.zombies.clear()
+    room.wave_remaining_to_spawn = ["walker"]
+    room.spawn_timer = 99.0
+
+    # Mua Phóng Lựu M79 & nâng cấp lên Mk.II -> Mk.III
+    room.handle("u1", "buy", {"item": "launcher"})
+    assert "launcher" in sv["weapons"]
+    assert sv["weaponLv"]["launcher"] == 1
+    room.handle("u1", "buy", {"item": "upgrade:launcher"})
+    assert sv["weaponLv"]["launcher"] == 2
+    room.handle("u1", "buy", {"item": "upgrade:launcher"})
+    assert sv["weaponLv"]["launcher"] == 3
+
+    # Bắn tên lửa M79 tiêu diệt mục tiêu gần đó bằng sát thương nổ lan
+    z = room._spawn_one_zombie("walker")
+    z["x"], z["y"] = 640.0, 450.0
+    room.handle("u1", "shoot", {"aim": 0.0})
+    for _ in range(10):
+        room.tick(dt_override=0.06)
+    assert z["hp"] <= 0
+
+    # Mua Shield & Stim (reset Dash cooldown)
+    sv["dashCd"] = time.time() + 3.0
+    sv["reloadUntil"] = time.time() + 2.0
+    room.handle("u1", "buy", {"item": "shield"})
+    assert sv["armor"] > sv["maxArmor"]
+    room.handle("u1", "buy", {"item": "stim"})
+    assert sv["dashCd"] == 0.0
+    assert sv["stimUntil"] > time.time()
+    room.handle("u1", "buy", {"item": "ammo"})
+    assert sv["reloadUntil"] == 0.0
+
+
+def test_zombie_miniboss_and_titan_telegraph_skills():
+    room = ZombieRoom("ZBOS", "lab")
+    room.join("u1", "Hunter", "#38bdf8")
+    room.handle("u1", "start", {})
+
+    # Kiểm tra các mốc Mini-Boss (Đợt 3, 6) và Boss lớn (Đợt 5, 10)
+    assert "butcher" in room._build_wave_queue(3)
+    assert "boss" in room._build_wave_queue(5)
+    assert "queen" in room._build_wave_queue(6)
+    assert "titan" in room._build_wave_queue(10)
+
+    # Kiểm tra chiêu Pháo Kích Nhiệt Hạch của Titan tạo vòng cảnh báo (telegraph)
+    room.zombies.clear()
+    room.wave_remaining_to_spawn = ["walker"]
+    room.spawn_timer = 99.0
+    sv = room.survivors["1"]
+    sv["x"], sv["y"] = 500.0, 450.0
+
+    titan = room._spawn_one_zombie("titan")
+    titan["x"], titan["y"] = 760.0, 450.0
+    titan["specialCd"] = 0.0
+    room.tick(dt_override=0.066)
+
+    assert len(room.telegraphs) >= 1
+    view = room.match_view("u1")
+    assert len(view["bosses"]) == 1
+    assert view["bosses"][0]["kind"] == "titan"
+    assert len(view["telegraphs"]) >= 1
