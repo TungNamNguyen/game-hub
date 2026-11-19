@@ -369,7 +369,11 @@ class Hub:
                     if voter is not None:
                         await asyncio.sleep(0.5)
                         with contextlib.suppress(GameError):
-                            room.vote_rematch(voter.uid)
+                            if isinstance(room, GeoRoom):
+                                await self._geo_prefetch_if_needed(room, "rematch", {})
+                                room.vote_rematch(voter.uid, allow_live_fetch=False)
+                            else:
+                                room.vote_rematch(voter.uid)
                         await self.broadcast_room(channel, code)
                         # PHẢI vòng lại, không được return: phiếu của máy vừa
                         # làm ván mới bắt đầu, mà ván mới có thể tới lượt máy đi
@@ -440,6 +444,34 @@ class Hub:
                 room.disconnect(session.uid)
             await self.broadcast_room(channel, code)
 
+    async def _geo_prefetch_if_needed(self, room: GeoRoom, kind: str, msg: dict) -> bool:
+        """Nạp trước tọa độ Google Street View ở worker thread để không bao giờ chặn event loop.
+
+        Trả về False nếu phòng đang bận tải từ một yêu cầu trước đó (chống bấm đúp / gọi đè).
+        """
+        if room.loading_round:
+            return False
+        need = room.needs_network_fetch_for(kind, msg)
+        if need <= 0:
+            return True
+        room.loading_round = True
+        try:
+            await asyncio.to_thread(room.prefetch_dynamic_locations, need)
+        finally:
+            room.loading_round = False
+        return True
+
+    async def _geo_async_tick(self, channel: str, code: str, room: GeoRoom, need: int) -> None:
+        """Chuyển vòng GeoRoom bất đồng bộ khi hết giờ reveal mà bộ đệm động đang trống."""
+        try:
+            await asyncio.to_thread(room.prefetch_dynamic_locations, need)
+        finally:
+            room.loading_round = False
+        if self.managers[channel].get(code) is not room:
+            return
+        if room.tick(allow_live_fetch=False):
+            await self.broadcast_room(channel, code)
+
     async def handle_game(self, session: Session, channel: str, kind: str, msg: dict) -> None:
         manager = self.managers[channel]
 
@@ -482,11 +514,22 @@ class Hub:
         elif kind == "resign":
             room.resign(uid)
         elif kind == "rematch":
-            room.vote_rematch(uid)
+            if isinstance(room, GeoRoom):
+                if not await self._geo_prefetch_if_needed(room, kind, msg):
+                    return
+                room.vote_rematch(uid, allow_live_fetch=False)
+            else:
+                room.vote_rematch(uid)
         elif kind == "say":
             room.say(uid, str(msg.get("text", "")))
         else:
-            room.handle(uid, kind, msg)
+            if isinstance(room, GeoRoom):
+                if kind in ("start", "next"):
+                    if not await self._geo_prefetch_if_needed(room, kind, msg):
+                        return
+                room.handle(uid, kind, msg, allow_live_fetch=False)
+            else:
+                room.handle(uid, kind, msg)
         await self.broadcast_room(channel, code)
 
     # ---- chat -------------------------------------------------------------- #
@@ -705,6 +748,17 @@ class Hub:
                 # Phòng không còn ai xem thì đóng băng, không để máy tự đấu với
                 # nhau tới hết ván trong một phòng vắng.
                 if not room.has_connection():
+                    continue
+                if isinstance(room, GeoRoom):
+                    if room.loading_round:
+                        continue
+                    need = room.needs_network_fetch_on_tick()
+                    if need > 0:
+                        room.loading_round = True
+                        asyncio.create_task(self._geo_async_tick(channel, code, room, need))
+                        continue
+                    if room.tick(allow_live_fetch=False):
+                        await self.broadcast_room(channel, code)
                     continue
                 if room.tick():
                     await self.broadcast_room(channel, code)

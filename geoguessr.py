@@ -10,9 +10,10 @@ import threading
 import time
 import urllib.request
 
-from games import GameError, SeatedRoom
+from games import GameError, SeatedRoom, bot_uid
 
 ROUNDS_PER_MATCH = 5
+ALLOWED_ROUND_COUNTS = (5, 10, 15, 20)
 MAX_DUEL_ROUNDS = 25
 MAX_STREAK_ROUNDS = 50
 GUESS_SECONDS = 60.0
@@ -23,6 +24,8 @@ EARTH_RADIUS_KM = 6371.071
 DEFAULT_WORLD_MAX_ERROR_KM = 14916.862
 # Lưu ở thư mục assets/ để tách biệt dữ liệu tĩnh với data/ (vốn bị .dockerignore chặn)
 GEO_DATA_PATH = Path(__file__).resolve().parent / "assets" / "geo_locations.json"
+
+GEO_BOT_NAMES = ("Phượt Thủ", "Hoa Tiêu", "Thổ Địa", "Nhà Bản Đồ", "Lữ Khách")
 
 ALLOWED_ROUND_TIMES = (30, 45, 60, 90, 120)
 DIFFICULTY_PRESETS: dict[str, dict] = {
@@ -75,7 +78,7 @@ MODE_ISO_COUNTRIES: dict[str, set[str]] = {
     },
     "oceania": {
         "AU", "NZ", "FJ", "PG", "SB", "VU", "NC", "PF", "WS", "TO", "CK",
-        "GU", "MP", "AS",
+        "GU", "MP", "AS", "PN", "UM", "CX", "CC", "NF",
     },
 }
 
@@ -257,14 +260,70 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         (25.0, 31.2, 29.8, 33.0),     # Ai Cập
     ],
     "oceania": [
+        # Úc — Đất liền & vùng trọng điểm
         (-38.5, -24.0, 140.5, 153.5), # Đông Úc (NSW, VIC, QLD, ACT)
+        (-24.0, -15.5, 144.5, 152.5), # Bắc Queensland (Cairns, Townsville, Mackay)
         (-43.5, -40.8, 144.8, 148.2), # Tasmania
-        (-35.5, -26.0, 134.0, 140.5), # Nam Úc
-        (-35.0, -18.0, 114.5, 124.0), # Tây Úc
-        (-25.0, -12.0, 129.5, 138.0), # Bắc Úc (NT & Alice Springs)
-        (-41.8, -34.6, 172.8, 178.4), # Đảo Bắc New Zealand
-        (-46.6, -40.8, 167.2, 174.2), # Đảo Nam New Zealand
+        (-35.5, -26.0, 134.0, 140.5), # Nam Úc (Adelaide, Barossa, Flinders)
+        (-35.0, -18.0, 114.5, 124.0), # Tây Úc (Perth, Margaret River, Broome)
+        (-25.0, -12.0, 129.5, 138.0), # Bắc Úc (Darwin, Kakadu, Alice Springs, Uluru)
+        # New Zealand — Đảo Bắc & Đảo Nam
+        (-41.8, -34.6, 172.8, 178.4), # Đảo Bắc New Zealand (Auckland, Rotorua, Wellington)
+        (-46.6, -40.8, 167.2, 174.2), # Đảo Nam New Zealand (Christchurch, Queenstown, Dunedin)
+        # Các quốc đảo & lãnh thổ hải ngoại Châu Đại Dương (đã xác thực có Street View 360° chính thức)
+        (13.26, 13.58, 144.65, 144.92),   # Guam (Tumon, Hagåtña, Umatac, Inarajan)
+        (15.10, 15.29, 145.69, 145.82),   # Saipan — Quần đảo Bắc Mariana
+        (14.94, 15.08, 145.58, 145.66),   # Tinian — Quần đảo Bắc Mariana
+        (14.12, 14.20, 145.13, 145.28),   # Rota — Quần đảo Bắc Mariana
+        (-14.37, -14.25, -170.84, -170.56), # American Samoa (Tutuila — Pago Pago, Tafuna, Leone)
+        (-16.28, -16.22, 168.10, 168.17), # Vanuatu (Đảo núi lửa Ambrym)
+        (-25.08, -25.05, -130.12, -130.08), # Quần đảo Pitcairn (Adamstown)
+        (28.19, 28.22, -177.39, -177.36), # Midway Atoll (Sand Island)
+        (-10.50, -10.41, 105.56, 105.71), # Đảo Christmas (Úc / Ấn Độ Dương)
+        (-12.20, -12.11, 96.81, 96.91),   # Quần đảo Cocos (Keeling)
+        (-36.06, -35.56, 136.53, 138.13), # Đảo Kangaroo (Nam Úc)
+        (-32.02, -31.99, 115.45, 115.56), # Đảo Rottnest (Tây Úc)
+        (-19.18, -19.10, 146.79, 146.88), # Đảo Magnetic (Queensland)
+        (-38.53, -38.44, 145.10, 145.36), # Đảo Phillip (Victoria)
+        (-43.49, -43.05, 147.17, 147.43), # Đảo Bruny (Tasmania)
+        (-40.15, -39.58, 143.82, 144.15), # Đảo King (Tasmania)
+        (-40.25, -39.72, 147.80, 148.35), # Đảo Flinders (Tasmania)
+        (-36.84, -36.75, 174.98, 175.18), # Đảo Waiheke (New Zealand)
+        (-46.96, -46.84, 168.05, 168.20), # Đảo Stewart / Rakiura (New Zealand)
     ],
+}
+
+# Siêu dữ liệu (mã quốc gia mặc định, bán kính quét m, trọng số chọn khung) cho các khung đảo nhỏ
+# giúp: (1) không bị từ chối khi Google RPC bỏ trống country_code trên đảo, (2) bán kính ôm sát đảo
+# tránh rơi xuống đại dương, (3) phân bổ tỷ lệ cân đối giữa đất liền và quốc đảo.
+STREETVIEW_BOX_META: dict[tuple[float, float, float, float], tuple[str, int, float]] = {
+    (-38.5, -24.0, 140.5, 153.5): ("AU", 45000, 6.0),
+    (-24.0, -15.5, 144.5, 152.5): ("AU", 45000, 3.0),
+    (-43.5, -40.8, 144.8, 148.2): ("AU", 40000, 2.5),
+    (-35.5, -26.0, 134.0, 140.5): ("AU", 45000, 3.0),
+    (-35.0, -18.0, 114.5, 124.0): ("AU", 45000, 3.0),
+    (-25.0, -12.0, 129.5, 138.0): ("AU", 45000, 2.5),
+    (-41.8, -34.6, 172.8, 178.4): ("NZ", 40000, 4.5),
+    (-46.6, -40.8, 167.2, 174.2): ("NZ", 40000, 4.5),
+    (13.26, 13.58, 144.65, 144.92): ("GU", 9000, 2.0),
+    (15.10, 15.29, 145.69, 145.82): ("MP", 9000, 1.4),
+    (14.94, 15.08, 145.58, 145.66): ("MP", 8000, 0.7),
+    (14.12, 14.20, 145.13, 145.28): ("MP", 8000, 0.7),
+    (-14.37, -14.25, -170.84, -170.56): ("AS", 9000, 1.8),
+    (-16.28, -16.22, 168.10, 168.17): ("VU", 10000, 0.9),
+    (-25.08, -25.05, -130.12, -130.08): ("PN", 8000, 0.7),
+    (28.19, 28.22, -177.39, -177.36): ("UM", 6000, 0.7),
+    (-10.50, -10.41, 105.56, 105.71): ("CX", 8000, 0.9),
+    (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 0.8),
+    (-36.06, -35.56, 136.53, 138.13): ("AU", 15000, 0.9),
+    (-32.02, -31.99, 115.45, 115.56): ("AU", 6000, 0.8),
+    (-19.18, -19.10, 146.79, 146.88): ("AU", 8000, 0.7),
+    (-38.53, -38.44, 145.10, 145.36): ("AU", 10000, 0.7),
+    (-43.49, -43.05, 147.17, 147.43): ("AU", 12000, 0.7),
+    (-40.15, -39.58, 143.82, 144.15): ("AU", 15000, 0.6),
+    (-40.25, -39.72, 147.80, 148.35): ("AU", 15000, 0.6),
+    (-36.84, -36.75, 174.98, 175.18): ("NZ", 8000, 0.8),
+    (-46.96, -46.84, 168.05, 168.20): ("NZ", 10000, 0.7),
 }
 STREETVIEW_LAND_BOXES["world"] = [
     box
@@ -294,6 +353,11 @@ REGION_ALIASES: dict[str, str] = {
     "ke": "Kenya", "tz": "Tanzania", "ug": "Uganda", "gh": "Ghana", "ng": "Nigeria",
     "sn": "Senegal", "bw": "Botswana", "na": "Namibia", "tn": "Tunisia", "ma": "Morocco",
     "au": "Úc", "nz": "New Zealand", "pf": "French Polynesia",
+    "gu": "Guam", "mp": "Quần đảo Bắc Mariana", "as": "American Samoa",
+    "vu": "Vanuatu", "pn": "Quần đảo Pitcairn", "um": "Midway Atoll",
+    "cx": "Đảo Christmas", "cc": "Quần đảo Cocos", "nf": "Đảo Norfolk",
+    "fj": "Fiji", "nc": "New Caledonia", "ws": "Samoa", "to": "Tonga",
+    "ck": "Quần đảo Cook", "pg": "Papua New Guinea", "sb": "Quần đảo Solomon",
 }
 
 CURATED_LOCATIONS: dict[str, list[dict]] = {   'asia': [   {   'hint': 'Tháp truyền thông màu đỏ trắng biểu tượng Tokyo',
@@ -577,14 +641,73 @@ _ALL_GEO_MODES = (
     "north_america", "south_america", "africa", "oceania",
 )
 
+# Circuit Breaker cho Google Street View RPC:
+# Sau 3 lần lỗi mạng/timeout liên tiếp, ngưng gọi Google 5 phút (300s) và dùng thẳng kho tĩnh.
+_SV_CB_THRESHOLD = 3
+_SV_CB_COOLDOWN_SEC = 300.0
+_SV_CB_LOCK = threading.Lock()
+_sv_cb_failures: int = 0
+_sv_cb_open_until: float = 0.0
+
+
+def is_sv_circuit_open() -> bool:
+    """True nếu Google Street View RPC đang trong thời gian tạm ngưng (circuit breaker mở)."""
+    with _SV_CB_LOCK:
+        return time.monotonic() < _sv_cb_open_until
+
+
+def _sv_record_network_failure() -> None:
+    global _sv_cb_failures, _sv_cb_open_until
+    with _SV_CB_LOCK:
+        _sv_cb_failures += 1
+        if _sv_cb_failures >= _SV_CB_THRESHOLD:
+            _sv_cb_open_until = time.monotonic() + _SV_CB_COOLDOWN_SEC
+
+
+def _sv_record_network_success() -> None:
+    global _sv_cb_failures, _sv_cb_open_until
+    with _SV_CB_LOCK:
+        _sv_cb_failures = 0
+        _sv_cb_open_until = 0.0
+
+
+def reset_sv_circuit() -> None:
+    """Đặt lại trạng thái circuit breaker (dùng cho kiểm thử hoặc khôi phục thủ công)."""
+    _sv_record_network_success()
+
+
 # Bộ đệm tọa độ Street View động theo thời gian thực (luôn giữ sẵn để vào vòng 0ms).
 _DYNAMIC_SV_LOCK = threading.RLock()
 _DYNAMIC_SV_CACHE: dict[str, list[dict]] = {m: [] for m in _ALL_GEO_MODES}
 _DYNAMIC_SV_INFLIGHT: set[str] = set()
 
 
+def _pick_land_box(mode: str) -> tuple[tuple[float, float, float, float], str, int]:
+    """Chọn một khung tọa độ theo trọng số (ưu tiên cân đối giữa đất liền và quốc đảo)."""
+    boxes = STREETVIEW_LAND_BOXES.get(mode) or STREETVIEW_LAND_BOXES["world"]
+    default_radius = 18000 if mode == "vietnam" else 45000
+    if mode == "oceania":
+        weights = [STREETVIEW_BOX_META.get(b, ("", default_radius, 1.0))[2] for b in boxes]
+        box = random.choices(boxes, weights=weights, k=1)[0]
+    elif mode == "world":
+        # Tránh các khung đảo nhỏ của oceania chiếm tỷ trọng quá lớn trong bản đồ thế giới
+        weights = [
+            0.25 if (b in STREETVIEW_BOX_META and STREETVIEW_BOX_META[b][2] < 2.0) else 1.0
+            for b in boxes
+        ]
+        box = random.choices(boxes, weights=weights, k=1)[0]
+    else:
+        box = random.choice(boxes)
+    meta = STREETVIEW_BOX_META.get(box)
+    if meta:
+        return box, meta[0], meta[1]
+    return box, "", default_radius
+
+
 def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout: float = 1.5) -> dict | None:
     """Truy vấn Google MapsJsInternalService/SingleImageSearch để lấy 100% ảnh Street View thật toàn cầu."""
+    if is_sv_circuit_open():
+        return None
     payload = json.dumps([
         ["apiv3"],
         [[None, None, round(lat, 6), round(lng, 6)], int(radius)],
@@ -602,7 +725,9 @@ def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read(32768).decode("utf-8", errors="ignore"))
+        _sv_record_network_success()
     except Exception:
+        _sv_record_network_failure()
         return None
 
     try:
@@ -648,18 +773,23 @@ def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout
 
 def fetch_random_streetview(mode: str = "world", attempts: int = 6, timeout: float = 1.4) -> dict | None:
     """Sinh một tọa độ ngẫu nhiên trong vùng bản đồ rồi bắt dính đường Street View gần nhất."""
-    boxes = STREETVIEW_LAND_BOXES.get(mode) or STREETVIEW_LAND_BOXES["world"]
-    search_radius = 18000 if mode == "vietnam" else 45000
+    if is_sv_circuit_open():
+        return None
     for _ in range(attempts):
-        lat_min, lat_max, lng_min, lng_max = random.choice(boxes)
+        if is_sv_circuit_open():
+            return None
+        (lat_min, lat_max, lng_min, lng_max), default_cc, search_radius = _pick_land_box(mode)
         lat = random.uniform(lat_min, lat_max)
         lng = random.uniform(lng_min, lng_max)
         res = probe_google_streetview(lat, lng, radius=search_radius, timeout=timeout)
         if res:
-            if not is_valid_country_for_mode(mode, res.get("country_code", ""), res.get("address", "")):
+            raw_cc = (res.get("country_code") or "").strip().upper()
+            if not raw_cc and default_cc:
+                raw_cc = default_cc
+            if not is_valid_country_for_mode(mode, raw_cc, res.get("address", "")):
                 continue
             s_lat, s_lng = res["lat"], res["lng"]
-            cc = (res.get("country_code") or "").strip().lower()
+            cc = raw_cc.lower()
             region = ""
             if mode != "vietnam" and cc:
                 region = REGION_ALIASES.get(cc, cc.upper())
@@ -682,6 +812,8 @@ def fetch_random_streetview(mode: str = "world", attempts: int = 6, timeout: flo
 
 def warm_dynamic_sv_cache(mode: str, target_count: int = 16) -> None:
     """Nạp trước song song nhiều tọa độ Street View thật vào RAM để vào vòng 0ms độ trễ."""
+    if is_sv_circuit_open():
+        return
     if mode not in _ALL_GEO_MODES:
         mode = "world"
     with _DYNAMIC_SV_LOCK:
@@ -691,21 +823,27 @@ def warm_dynamic_sv_cache(mode: str, target_count: int = 16) -> None:
 
     def _worker() -> None:
         try:
+            if is_sv_circuit_open():
+                return
             with _DYNAMIC_SV_LOCK:
                 need = max(0, target_count - len(_DYNAMIC_SV_CACHE.get(mode, [])))
             if need <= 0:
                 return
             # Dùng 4 luồng song song để nạp đầy bộ đệm chỉ trong ~0.4-0.8s
-            with ThreadPoolExecutor(max_workers=4, thread_name_prefix=f"geo-{mode}") as pool:
-                futures = [pool.submit(fetch_random_streetview, mode, 6, 1.4) for _ in range(need)]
-                for fut in futures:
-                    try:
-                        loc = fut.result(timeout=6.0)
-                    except Exception:
-                        loc = None
-                    if loc:
-                        with _DYNAMIC_SV_LOCK:
-                            _DYNAMIC_SV_CACHE.setdefault(mode, []).append(loc)
+            try:
+                with ThreadPoolExecutor(max_workers=4, thread_name_prefix=f"geo-{mode}") as pool:
+                    futures = [pool.submit(fetch_random_streetview, mode, 6, 1.4) for _ in range(need)]
+                    for fut in futures:
+                        try:
+                            loc = fut.result(timeout=6.0)
+                        except Exception:
+                            loc = None
+                        if loc:
+                            with _DYNAMIC_SV_LOCK:
+                                _DYNAMIC_SV_CACHE.setdefault(mode, []).append(loc)
+            except RuntimeError:
+                # Tránh traceback khi interpreter đang tắt
+                return
         finally:
             with _DYNAMIC_SV_LOCK:
                 _DYNAMIC_SV_INFLIGHT.discard(mode)
@@ -713,9 +851,12 @@ def warm_dynamic_sv_cache(mode: str, target_count: int = 16) -> None:
     threading.Thread(target=_worker, daemon=True, name=f"geo-sv-{mode}").start()
 
 
-# Nạp trước toàn bộ 8 khu vực ngay khi khởi động server để mọi khu vực vào trận 0ms
-for _boot_mode in _ALL_GEO_MODES:
-    warm_dynamic_sv_cache(_boot_mode, target_count=10 if _boot_mode in ("world", "vietnam") else 6)
+def warm_all_sv_caches() -> None:
+    """Nạp trước các khu vực phổ biến khi server khởi động (gọi từ lifespan, không chạy lúc import)."""
+    if is_sv_circuit_open():
+        return
+    for boot_mode in _ALL_GEO_MODES:
+        warm_dynamic_sv_cache(boot_mode, target_count=10 if boot_mode in ("world", "vietnam") else 6)
 
 
 class GeoRoom(SeatedRoom):
@@ -742,6 +883,7 @@ class GeoRoom(SeatedRoom):
             "difficulty": "global",       # global (100% Street View) | landmark (Địa danh)
             "move_rule": "MOVING",        # MOVING | NM | NMPZ
             "round_time": 60,             # 30 | 45 | 60 | 90 | 120
+            "rounds": ROUNDS_PER_MATCH,   # 5 | 10 | 15 | 20 (cho chế độ classic / solo)
             "panic_rule": "ALL_ACTIVE_MEMBERS",  # ALL_ACTIVE_MEMBERS | FIRST_MEMBER
             "hp_a": 6000,                 # 3000 | 6000 | 12000
             "hp_b": 6000,
@@ -751,6 +893,7 @@ class GeoRoom(SeatedRoom):
             m: ("A" if int(m) % 2 == 1 else "B") for m in self.SEATS
         }
         self.session_seen_coords: set[tuple[float, float]] = set()
+        self.loading_round: bool = False
         self.reset_match()
         # Nạp sẵn bộ đệm Street View ngay khi tạo phòng để bấm Bắt đầu vào 0ms
         warm_dynamic_sv_cache(self.mode, target_count=16)
@@ -764,10 +907,87 @@ class GeoRoom(SeatedRoom):
     def _team_marks(self, team: str) -> list[str]:
         return [m for m in self._seated_marks() if self.teams.get(m) == team]
 
+    def _human_seated_marks(self) -> list[str]:
+        return [
+            m for m in self._seated_marks()
+            if (p := self.seat(m)) is not None and not p.bot
+        ]
+
+    # ---- quản lý máy (Bot) cho mọi chế độ Địa Đồ --------------------------- #
+    def add_bot(self, level: str = "normal", mark: str = "") -> Player:
+        """Thêm máy cho phòng chơi đơn (/api/rooms/solo).
+
+        Chừa ghế "1" (Đội A) cho người tạo phòng và đặt máy vào ghế "2" (Đội B)
+        để có thể chơi ngay cả Classic, Streak lẫn Đấu Sinh Tử (Duel 1v1).
+        """
+        if self.bot_players():
+            raise GameError("Phòng này đã có máy.")
+        free = self.free_marks()
+        if not mark:
+            if not self._human_seated_marks():
+                if "2" in free:
+                    mark = "2"
+                elif len(free) >= 2:
+                    mark = free[1]
+                else:
+                    raise GameError("Không còn ghế cho máy.")
+            elif free:
+                mark = free[0]
+            else:
+                raise GameError("Không còn ghế cho máy.")
+        elif mark not in free:
+            raise GameError("Ghế đó đã có người.")
+        lvl = level if level in ("easy", "normal", "hard") else "normal"
+        name = f"{GEO_BOT_NAMES[0]} (Máy)"
+        return self._seat_bot(mark, lvl, name, slot=0)
+
+    def add_single_bot(self, level: str = "normal", mark: str = "") -> Player:
+        """Thêm từng máy vào một ghế trống cụ thể hoặc ghế trống tiếp theo."""
+        if self.in_progress():
+            raise GameError("Không thể thêm máy khi ván đang chạy.")
+        free = self.free_marks()
+        if not free:
+            raise GameError("Bàn đã đủ 6 người.")
+        if mark:
+            if mark not in free:
+                raise GameError("Ghế đó đã có người.")
+            target = mark
+        else:
+            target = free[0]
+        slot = 0
+        while bot_uid(slot) in self.players:
+            slot += 1
+        lvl = level if level in ("easy", "normal", "hard") else "normal"
+        name = f"{GEO_BOT_NAMES[slot % len(GEO_BOT_NAMES)]} (Máy)"
+        return self._seat_bot(target, lvl, name, slot=slot)
+
+    def remove_bot_seat(self, mark: str) -> None:
+        """Gỡ máy khỏi ghế khi phòng đang chờ."""
+        if self.in_progress():
+            raise GameError("Không thể gỡ máy khi ván đang chạy.")
+        p = self.seat(mark)
+        if p is None or not p.bot:
+            raise GameError("Ghế này không có máy.")
+        self.players.pop(p.uid, None)
+        self.rematch.discard(mark)
+        self.drafts.pop(mark, None)
+        self.guesses.pop(mark, None)
+        self.system(f"Đã gỡ {p.name} khỏi {self._seat_label(mark)}.")
+        if self.status == "finished":
+            self.status = "waiting"
+        self.touched = time.time()
+
+    def bot_pending(self, mark: str) -> bool:
+        if not self.in_progress() or self.phase != "guessing" or self.loading_round:
+            return False
+        if self.config.get("format") == "streak" and mark in self.eliminated:
+            return False
+        return mark not in self.guesses
+
     def reset_match(self) -> None:
         self.phase: str = "waiting"  # waiting | guessing | round_result | finished
         self.round_idx: int = 0
-        self.total_rounds: int = ROUNDS_PER_MATCH
+        self.total_rounds: int = int(self.config.get("rounds", ROUNDS_PER_MATCH))
         self.deck: list[dict] = []
         self.drafts: dict[str, dict] = {}
         self.guesses: dict[str, dict] = {}
@@ -788,8 +1008,8 @@ class GeoRoom(SeatedRoom):
         self.abandoned: bool = False
 
     def _try_start(self) -> None:
-        """Cho phép người chơi tự bấm Bắt đầu khi sẵn sàng."""
-        if self.in_progress():
+        """Cho phép người chơi tự bấm Bắt đầu khi sẵn sàng (không auto-start khi có Bot)."""
+        if self.in_progress() or self.bot_players():
             return
         if len(self._seated_marks()) == len(self.SEATS):
             if self.config["format"] == "duel":
@@ -819,7 +1039,110 @@ class GeoRoom(SeatedRoom):
             and self.config.get("dynamic_sv", True)
         )
 
-    def _draw_location(self, used_coords: set[tuple[float, float]]) -> dict:
+    def _balanced_static_sample(self, candidates: list[dict], count: int) -> list[dict]:
+        """Chọn điểm từ kho tĩnh có cân bằng theo quốc gia/khu vực (tránh Mỹ/Úc chiếm 21%)."""
+        if not candidates or count <= 0:
+            return []
+        by_region: dict[str, list[dict]] = {}
+        for item in candidates:
+            reg = extract_region(item, self.mode) or "Khác"
+            by_region.setdefault(reg, []).append(item)
+        for lst in by_region.values():
+            random.shuffle(lst)
+
+        picked: list[dict] = []
+        used_keys: set[tuple[float, float]] = set()
+        while len(picked) < count and by_region:
+            regs = list(by_region.keys())
+            # Trọng số căn bậc hai số lượng điểm giúp nước lớn không áp đảo tuyệt đối
+            weights = [math.sqrt(len(by_region[r])) for r in regs]
+            chosen_reg = random.choices(regs, weights=weights, k=1)[0]
+            bucket = by_region[chosen_reg]
+            item = bucket.pop()
+            if not bucket:
+                by_region.pop(chosen_reg, None)
+            key = (item["lat"], item["lng"])
+            if key not in used_keys:
+                used_keys.add(key)
+                picked.append(item)
+        return picked
+
+    def _available_dynamic_cache_count(self) -> int:
+        with _DYNAMIC_SV_LOCK:
+            cache = _DYNAMIC_SV_CACHE.get(self.mode, [])
+            return sum(
+                1 for cand in cache
+                if (cand["lat"], cand["lng"]) not in self.session_seen_coords
+            )
+
+    def needs_network_fetch_for(self, kind: str, msg: dict | None = None) -> int:
+        """Trả về số địa điểm động cần gọi Google trước khi thực thi ``kind`` (0 = không cần gọi mạng)."""
+        if self.loading_round or not self._is_global_dynamic() or is_sv_circuit_open():
+            return 0
+        if kind == "start":
+            if self.in_progress() or len(self._seated_marks()) < 1:
+                return 0
+            if self.config.get("format") == "duel" and (not self._team_marks("A") or not self._team_marks("B")):
+                return 0
+            fmt = self.config.get("format", "classic")
+            target_len = (
+                MAX_DUEL_ROUNDS if fmt == "duel"
+                else MAX_STREAK_ROUNDS if fmt == "streak"
+                else int(self.config.get("rounds", ROUNDS_PER_MATCH))
+            )
+            initial_need = min(target_len, ROUNDS_PER_MATCH)
+            avail = self._available_dynamic_cache_count()
+            return max(0, initial_need - avail)
+        if kind == "rematch":
+            if self.status != "finished":
+                return 0
+            seated = set(self._seated_marks())
+            if len(seated) >= 1 and len(self.rematch) + 1 >= len(seated):
+                avail = self._available_dynamic_cache_count()
+                return max(0, ROUNDS_PER_MATCH - avail)
+            return 0
+        if kind == "next":
+            if not self.in_progress() or self.phase != "round_result":
+                return 0
+            next_idx = self.round_idx + 1
+            if next_idx < len(self.deck):
+                return 0
+            return 0 if self._available_dynamic_cache_count() >= 1 else 1
+        return 0
+
+    def needs_network_fetch_on_tick(self) -> int:
+        """Trả về số địa điểm động cần tải trước khi ``tick()`` chuyển sang vòng tiếp theo."""
+        if self.loading_round or not self.in_progress() or not self.deadline:
+            return 0
+        if self.phase != "round_result" or time.time() < self.deadline:
+            return 0
+        if not self._is_global_dynamic() or is_sv_circuit_open():
+            return 0
+        if self.round_idx + 1 < len(self.deck):
+            return 0
+        return 0 if self._available_dynamic_cache_count() >= 1 else 1
+
+    def prefetch_dynamic_locations(self, count: int) -> None:
+        """Chạy trong worker thread (``asyncio.to_thread``) để nạp tọa độ Google mà không chặn event loop."""
+        if count <= 0 or is_sv_circuit_open():
+            return
+        mode = self.mode
+        workers = max(1, min(5, count))
+        try:
+            with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="geo-async") as ex:
+                futs = [ex.submit(fetch_random_streetview, mode, 6, 1.5) for _ in range(count)]
+                for fut in futs:
+                    try:
+                        loc = fut.result(timeout=6.0)
+                    except Exception:
+                        loc = None
+                    if loc:
+                        with _DYNAMIC_SV_LOCK:
+                            _DYNAMIC_SV_CACHE.setdefault(mode, []).append(loc)
+        except RuntimeError:
+            return
+
+    def _draw_location(self, used_coords: set[tuple[float, float]], allow_live_fetch: bool = True) -> dict:
         if self._is_global_dynamic():
             picked: dict | None = None
             with _DYNAMIC_SV_LOCK:
@@ -833,14 +1156,17 @@ class GeoRoom(SeatedRoom):
             warm_dynamic_sv_cache(self.mode, target_count=12)
             if picked is not None:
                 return picked
-            # Nếu bộ đệm tạm cạn, gọi trực tiếp Google RPC trước khi lùi về dự phòng
-            for _ in range(2):
-                live = fetch_random_streetview(self.mode, attempts=8, timeout=1.6)
-                if live:
-                    key = (live["lat"], live["lng"])
-                    if key not in used_coords and key not in self.session_seen_coords:
-                        warm_dynamic_sv_cache(self.mode, target_count=12)
-                        return live
+            # Nếu bộ đệm tạm cạn và circuit breaker đóng, gọi trực tiếp Google RPC trước khi lùi về dự phòng
+            if allow_live_fetch and not is_sv_circuit_open():
+                for _ in range(2):
+                    if is_sv_circuit_open():
+                        break
+                    live = fetch_random_streetview(self.mode, attempts=6, timeout=1.5)
+                    if live:
+                        key = (live["lat"], live["lng"])
+                        if key not in used_coords and key not in self.session_seen_coords:
+                            warm_dynamic_sv_cache(self.mode, target_count=12)
+                            return live
 
         pool = self._pool_for_config()
         candidates = [
@@ -851,9 +1177,10 @@ class GeoRoom(SeatedRoom):
             candidates = [x for x in pool if (x["lat"], x["lng"]) not in used_coords]
         if not candidates:
             candidates = pool
-        return random.choice(candidates)
+        sampled = self._balanced_static_sample(candidates, 1)
+        return sampled[0] if sampled else random.choice(candidates)
 
-    def _start_match(self) -> None:
+    def _start_match(self, allow_live_fetch: bool = True) -> None:
         seated = self._seated_marks()
         if len(seated) < 1:
             raise GameError("Cần ít nhất 1 người chơi ngồi vào ghế để bắt đầu.")
@@ -865,7 +1192,7 @@ class GeoRoom(SeatedRoom):
         target_len = (
             MAX_DUEL_ROUNDS if fmt == "duel"
             else MAX_STREAK_ROUNDS if fmt == "streak"
-            else ROUNDS_PER_MATCH
+            else int(self.config.get("rounds", ROUNDS_PER_MATCH))
         )
 
         deck: list[dict] = []
@@ -886,9 +1213,9 @@ class GeoRoom(SeatedRoom):
                         self.session_seen_coords.add(key)
 
             missing = initial_need - len(deck)
-            if missing > 0:
+            if missing > 0 and allow_live_fetch and not is_sv_circuit_open():
                 with ThreadPoolExecutor(max_workers=min(5, missing), thread_name_prefix="geo-burst") as ex:
-                    futs = [ex.submit(fetch_random_streetview, self.mode, 8, 1.6) for _ in range(missing)]
+                    futs = [ex.submit(fetch_random_streetview, self.mode, 6, 1.5) for _ in range(missing)]
                     for fut in futs:
                         try:
                             loc = fut.result(timeout=6.0)
@@ -903,15 +1230,15 @@ class GeoRoom(SeatedRoom):
             warm_dynamic_sv_cache(self.mode, target_count=12)
 
         # Chỉ dùng pool tĩnh cho chế độ Landmark, hoặc khi mạng không kết nối được Google
-        if len(deck) < (target_len if not self._is_global_dynamic() else min(target_len, ROUNDS_PER_MATCH)):
+        need = target_len if not self._is_global_dynamic() else min(target_len, ROUNDS_PER_MATCH)
+        if len(deck) < need:
             pool = self._pool_for_config()
             fresh = [x for x in pool if (x["lat"], x["lng"]) not in self.session_seen_coords]
-            if len(fresh) < target_len:
+            if len(fresh) < need:
                 self.session_seen_coords.clear()
                 fresh = list(pool)
-            random.shuffle(fresh)
-            need = target_len if not self._is_global_dynamic() else min(target_len, ROUNDS_PER_MATCH)
-            for item in fresh:
+            still_need = need - len(deck)
+            for item in self._balanced_static_sample(fresh, still_need * 2):
                 if len(deck) >= need:
                     break
                 key = (item["lat"], item["lng"])
@@ -920,7 +1247,7 @@ class GeoRoom(SeatedRoom):
                     used.add(key)
                     self.session_seen_coords.add(key)
             while len(deck) < need:
-                loc = self._draw_location(used)
+                loc = self._draw_location(used, allow_live_fetch=False)
                 key = (loc["lat"], loc["lng"])
                 used.add(key)
                 self.session_seen_coords.add(key)
@@ -932,14 +1259,16 @@ class GeoRoom(SeatedRoom):
         self.total_rounds = target_len
         self.status = self.START_STATUS
         self.rematch.clear()
-        self._begin_round(0)
+        self._begin_round(0, allow_live_fetch=allow_live_fetch)
 
-    def _begin_round(self, idx: int) -> None:
+    def _begin_round(self, idx: int, allow_live_fetch: bool = True) -> None:
         while idx >= len(self.deck):
             used = {(x["lat"], x["lng"]) for x in self.deck}
-            loc = self._draw_location(used)
+            loc = self._draw_location(used, allow_live_fetch=allow_live_fetch)
             self.session_seen_coords.add((loc["lat"], loc["lng"]))
             self.deck.append(loc)
+        if self._is_global_dynamic():
+            warm_dynamic_sv_cache(self.mode, target_count=12)
         self.round_idx = idx
         self.phase = "guessing"
         self.drafts = {}
@@ -996,6 +1325,12 @@ class GeoRoom(SeatedRoom):
         if len(active_marks) < 2:
             return
 
+        # Bot chốt tọa độ sớm không được kích hoạt đồng hồ Panic 15s cướp thời gian của người chơi thật.
+        actor_player = self.seat(actor_mark)
+        has_humans = bool(self._human_seated_marks())
+        if actor_player is not None and actor_player.bot and has_humans:
+            return
+
         if fmt in ("classic", "streak"):
             self._trigger_panic("FFA", now)
             return
@@ -1009,12 +1344,16 @@ class GeoRoom(SeatedRoom):
 
         # ALL_ACTIVE_MEMBERS: tất cả thành viên đang kết nối của một đội phải Lock
         for team in ("A", "B"):
+            team_marks = self._team_marks(team)
+            # Bỏ qua đội toàn Bot để tránh Bot ép Panic 15s lên người chơi đội đối diện
+            if has_humans and not any((p := self.seat(m)) is not None and not p.bot for m in team_marks):
+                continue
             active_team = [
-                m for m in self._team_marks(team)
+                m for m in team_marks
                 if (p := self.seat(m)) is not None and p.connected
             ]
             if not active_team:
-                active_team = self._team_marks(team)
+                active_team = team_marks
             if active_team and all(m in self.guesses for m in active_team):
                 self._trigger_panic(team, now)
                 break
@@ -1179,7 +1518,7 @@ class GeoRoom(SeatedRoom):
         else:
             self.system(f"Đáp án vòng {self.round_idx + 1}: {target['name']}.")
 
-    def _advance_or_finish(self) -> None:
+    def _advance_or_finish(self, allow_live_fetch: bool = True) -> None:
         fmt = self.config.get("format")
         if fmt == "duel":
             if self.hp_a <= 0 or self.hp_b <= 0 or self.zero_streak >= 3 or self.round_idx + 1 >= self.total_rounds:
@@ -1187,20 +1526,28 @@ class GeoRoom(SeatedRoom):
                     self.abandoned = True
                 self._finish_match()
                 return
-            self._begin_round(self.round_idx + 1)
+            self._begin_round(self.round_idx + 1, allow_live_fetch=allow_live_fetch)
             return
 
         if fmt == "streak":
             seated = self._seated_marks()
             alive = [m for m in seated if m not in self.eliminated]
-            if not alive or (len(seated) >= 2 and len(alive) <= 1) or self.round_idx + 1 >= self.total_rounds:
+            humans = self._human_seated_marks()
+            humans_alive = [m for m in humans if m not in self.eliminated]
+            # Nếu có người chơi thật và tất cả người chơi thật đều đã bị loại -> kết thúc luôn
+            if (
+                not alive
+                or (humans and not humans_alive)
+                or (len(seated) >= 2 and len(alive) <= 1)
+                or self.round_idx + 1 >= self.total_rounds
+            ):
                 self._finish_match()
                 return
-            self._begin_round(self.round_idx + 1)
+            self._begin_round(self.round_idx + 1, allow_live_fetch=allow_live_fetch)
             return
 
         if self.round_idx + 1 < self.total_rounds:
-            self._begin_round(self.round_idx + 1)
+            self._begin_round(self.round_idx + 1, allow_live_fetch=allow_live_fetch)
         else:
             self._finish_match()
 
@@ -1316,22 +1663,24 @@ class GeoRoom(SeatedRoom):
             raise GameError("Ván chưa bắt đầu.")
         self.stand(uid)
 
-    def vote_rematch(self, uid: str) -> None:
+    def vote_rematch(self, uid: str, allow_live_fetch: bool = True) -> None:
         player = self.players.get(uid)
         if player is None or not player.mark:
             raise GameError("Chỉ người đang ngồi mới xin đánh lại được.")
         if self.status != "finished":
             raise GameError("Ván chưa xong.")
+        if self.loading_round:
+            return
         self.rematch.add(player.mark)
         self.touched = time.time()
         seated = set(self._seated_marks())
         if len(seated) >= 1 and self.rematch >= seated:
-            self._start_match()
+            self._start_match(allow_live_fetch=allow_live_fetch)
         else:
             self.system(f"{player.name} muốn chơi ván mới.")
 
-    def tick(self) -> bool:
-        if not self.in_progress() or not self.deadline:
+    def tick(self, allow_live_fetch: bool = True) -> bool:
+        if self.loading_round or not self.in_progress() or not self.deadline:
             return False
         now = time.time()
         if self.phase == "guessing":
@@ -1342,7 +1691,7 @@ class GeoRoom(SeatedRoom):
         if self.phase == "round_result":
             if now < self.deadline:
                 return False
-            self._advance_or_finish()
+            self._advance_or_finish(allow_live_fetch=allow_live_fetch)
             return True
         return False
 
@@ -1392,6 +1741,22 @@ class GeoRoom(SeatedRoom):
             self.config["move_rule"] = mv
         if explicit_rt in ALLOWED_ROUND_TIMES:
             self.config["round_time"] = int(explicit_rt)
+        raw_rounds = (
+            msg.get("rounds")
+            if msg.get("rounds") is not None
+            else msg.get("roundCount")
+            if msg.get("roundCount") is not None
+            else msg.get("questionCount")
+        )
+        if raw_rounds is not None:
+            try:
+                rv = int(raw_rounds)
+                if rv in ALLOWED_ROUND_COUNTS:
+                    self.config["rounds"] = rv
+                    if not self.in_progress() and self.config.get("format", "classic") == "classic":
+                        self.total_rounds = rv
+            except (TypeError, ValueError):
+                pass
         pr = msg.get("panicRule") or msg.get("panic_rule")
         if pr in ("ALL_ACTIVE_MEMBERS", "FIRST_MEMBER"):
             self.config["panic_rule"] = pr
@@ -1406,7 +1771,7 @@ class GeoRoom(SeatedRoom):
         self.hp_b = self.config["hp_b"]
         self.touched = time.time()
 
-    def handle(self, uid: str, action: str, msg: dict) -> None:
+    def handle(self, uid: str, action: str, msg: dict, allow_live_fetch: bool = True) -> None:
         player = self.players.get(uid)
         if player is None or not player.mark:
             raise GameError("Bạn cần ngồi vào ghế để thao tác.")
@@ -1415,28 +1780,54 @@ class GeoRoom(SeatedRoom):
             if self.in_progress():
                 raise GameError("Không thể đổi cài đặt khi ván đang diễn ra.")
             self._apply_config(msg)
+            rounds_txt = f", {self.config['rounds']} vòng" if self.config.get("format") == "classic" else ""
             self.system(
                 f"{player.name} chỉnh phòng: {self.config['format'].upper()}, "
-                f"{self.config['difficulty']}, {self.config['move_rule']}, {self.config['round_time']}s."
+                f"{self.config['difficulty']}, {self.config['move_rule']}, {self.config['round_time']}s{rounds_txt}."
             )
+            return
+
+        if action == "add_bot":
+            if self.in_progress():
+                raise GameError("Không thể thêm máy khi ván đang diễn ra.")
+            level = str(msg.get("level", "normal"))
+            mark = str(msg.get("mark", ""))
+            self.add_single_bot(level=level, mark=mark)
+            return
+
+        if action == "remove_bot":
+            if self.in_progress():
+                raise GameError("Không thể gỡ máy khi ván đang diễn ra.")
+            self.remove_bot_seat(str(msg.get("mark", "")))
             return
 
         if action == "switch_team":
             if self.in_progress():
                 raise GameError("Không thể đổi đội khi ván đang diễn ra.")
+            req_mark = str(msg.get("mark", "")).strip()
+            target_mark = player.mark
+            target_name = player.name
+            if req_mark and req_mark != player.mark:
+                target_p = self.seat(req_mark)
+                if target_p is None or not target_p.bot:
+                    raise GameError("Chỉ có thể đổi đội cho chính bạn hoặc cho Máy.")
+                target_mark = req_mark
+                target_name = target_p.name
             target_team = msg.get("team")
             if target_team not in ("A", "B"):
-                cur = self.teams.get(player.mark, "A")
+                cur = self.teams.get(target_mark, "A")
                 target_team = "B" if cur == "A" else "A"
-            self.teams[player.mark] = target_team
+            self.teams[target_mark] = target_team
             self.touched = time.time()
-            self.system(f"{player.name} chuyển sang Đội {target_team}.")
+            self.system(f"{target_name} chuyển sang Đội {target_team}.")
             return
 
         if action == "start":
+            if self.loading_round:
+                return
             if self.in_progress():
                 raise GameError("Ván đang diễn ra.")
-            self._start_match()
+            self._start_match(allow_live_fetch=allow_live_fetch)
             return
 
         if action == "draft":
@@ -1461,7 +1852,7 @@ class GeoRoom(SeatedRoom):
             return
 
         if action == "next":
-            if not self.in_progress():
+            if self.loading_round or not self.in_progress():
                 return
             req_round = msg.get("round")
             if req_round is not None:
@@ -1472,7 +1863,7 @@ class GeoRoom(SeatedRoom):
                     pass
             if self.phase != "round_result":
                 return
-            self._advance_or_finish()
+            self._advance_or_finish(allow_live_fetch=allow_live_fetch)
             return
 
         raise GameError("Hành động không hợp lệ.")
@@ -1546,11 +1937,13 @@ class GeoRoom(SeatedRoom):
                 "difficulty": normalize_difficulty(self.config.get("difficulty", "global")),
                 "moveRule": self.config.get("move_rule", "MOVING"),
                 "roundTime": self.config.get("round_time", 60),
+                "rounds": int(self.config.get("rounds", ROUNDS_PER_MATCH)),
                 "panicRule": self.config.get("panic_rule", "ALL_ACTIVE_MEMBERS"),
                 "hpA": self.config.get("hp_a", 6000),
                 "hpB": self.config.get("hp_b", 6000),
                 "dynamicSv": bool(self.config.get("dynamic_sv", True)),
             },
+            "loadingRound": self.loading_round,
             "difficulty": normalize_difficulty(self.config.get("difficulty", "global")),
             "streaks": dict(self.best_streaks),
             "eliminated": sorted(self.eliminated),

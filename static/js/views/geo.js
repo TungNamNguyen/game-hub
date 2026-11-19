@@ -13,8 +13,13 @@ const CHANNEL = 'geo';
 const SV_EMBED_KEY = ['AIzaSyA_t5gb2Mn37', 'dZjhsaJ4F-OPp1PWDxqZyI'].join('');
 
 const DIFF_IDS = ['global', 'landmark'];
+const ROUND_COUNTS = [5, 10, 15, 20];
 const MAP_IDS = ['world', 'vietnam', 'asia', 'europe', 'north_america', 'south_america', 'africa', 'oceania'];
 const normalizeDiff = (raw) => (raw === 'landmark' || raw === 'easy' ? 'landmark' : 'global');
+const normalizeRounds = (raw) => {
+  const n = Number(raw);
+  return ROUND_COUNTS.includes(n) ? n : 5;
+};
 const diffLabel = (id) => t('geo.diff.' + normalizeDiff(id));
 
 function getGmapsJsKey() {
@@ -140,19 +145,11 @@ export default {
   async mount(root, ctx, param) {
     if (!param) {
       let lobbyDiff = normalizeDiff(localStorage.getItem('hub.diff.geo'));
+      let lobbyRounds = normalizeRounds(localStorage.getItem('hub.rounds.geo'));
       localStorage.setItem('hub.diff.geo', lobbyDiff);
-      const cleanup = await renderLobby(root, ctx, CHANNEL, {
-        title: t('geo.title'),
-        blurb: '',
-        iconName: 'globe',
-        onEnter: (code) => ctx.navigate(`${CHANNEL}/${code}`),
-        humanHint: '',
-        extraBody: () => ({ config: { difficulty: lobbyDiff } }),
-      });
+      localStorage.setItem('hub.rounds.geo', String(lobbyRounds));
 
-      const quickBtn = Array.from(root.querySelectorAll('button')).find((b) => b.textContent.includes(t('room.quickPlay')));
-      const actionsRow = quickBtn?.parentElement;
-      if (actionsRow) {
+      const buildExtraFields = (side) => {
         const diffBar = h('div', { className: 'geo-lobby-diff' },
           h('span', { className: 'geo-cfg-label' }, t('geo.diffLabel')),
           h('div', { className: 'geo-cfg-pills' },
@@ -167,30 +164,59 @@ export default {
                 }
               },
             }, diffLabel(id)))));
-        actionsRow.parentElement.insertBefore(diffBar, actionsRow);
 
-        const soloBtn = h('button', {
-          type: 'button',
-          className: 'grow',
-          onclick: async () => {
-            soloBtn.disabled = true;
-            try {
-              const mode = localStorage.getItem(`hub.mode.${CHANNEL}`) || 'world';
-              const { code } = await postJSON('/api/rooms', {
-                channel: CHANNEL,
-                mode,
-                config: { difficulty: lobbyDiff },
-              });
-              sessionStorage.setItem('geo.autostart', code);
-              ctx.navigate(`${CHANNEL}/${code}`);
-            } catch (err) {
-              toast(err.message, 'error');
-              soloBtn.disabled = false;
-            }
-          },
-        }, t('geo.playSoloNow'));
-        actionsRow.appendChild(soloBtn);
-      }
+        const roundsBar = h('div', { className: 'geo-lobby-diff' },
+          h('span', { className: 'geo-cfg-label' }, t('geo.cfgRounds')),
+          h('div', { className: 'geo-cfg-pills' },
+            ROUND_COUNTS.map((n) => h('button', {
+              type: 'button',
+              className: 'xs ' + (lobbyRounds === n ? 'primary' : 'ghost'),
+              onclick: (e) => {
+                lobbyRounds = n;
+                localStorage.setItem('hub.rounds.geo', String(n));
+                for (const b of e.currentTarget.parentElement.children) {
+                  b.className = 'xs ' + (b === e.currentTarget ? 'primary' : 'ghost');
+                }
+              },
+            }, String(n)))));
+
+        const soloRow = side === 'human'
+          ? h('div', { className: 'row', style: { marginTop: '2px' } },
+              h('button', {
+                type: 'button',
+                className: 'grow ghost',
+                onclick: async (e) => {
+                  const btn = e.currentTarget;
+                  btn.disabled = true;
+                  try {
+                    const mode = localStorage.getItem(`hub.mode.${CHANNEL}`) || 'world';
+                    const { code } = await postJSON('/api/rooms', {
+                      channel: CHANNEL,
+                      mode,
+                      config: { difficulty: lobbyDiff, rounds: lobbyRounds },
+                    });
+                    sessionStorage.setItem('geo.autostart', code);
+                    ctx.navigate(`${CHANNEL}/${code}`);
+                  } catch (err) {
+                    toast(err.message, 'error');
+                    btn.disabled = false;
+                  }
+                },
+              }, t('geo.playSoloNow')))
+          : null;
+
+        return h('div', { className: 'col', style: { gap: '8px' } }, diffBar, roundsBar, soloRow);
+      };
+
+      const cleanup = await renderLobby(root, ctx, CHANNEL, {
+        title: t('geo.title'),
+        blurb: '',
+        iconName: 'globe',
+        onEnter: (code) => ctx.navigate(`${CHANNEL}/${code}`),
+        humanHint: '',
+        extraBody: () => ({ config: { difficulty: lobbyDiff, rounds: lobbyRounds } }),
+        extraFields: buildExtraFields,
+      });
       return cleanup;
     }
 
@@ -218,6 +244,7 @@ export default {
     let hoverLeaveTimer = null;
     let drawerOpen = false;
     let nextPending = false;
+    let botLevelPick = localStorage.getItem(`hub.level.${CHANNEL}`) || 'normal';
     let lastSvUrl = '';
     let lastSeatsKey = '';
     let lastLobbyChatKey = '';
@@ -837,6 +864,15 @@ export default {
         ], cfg.roundTime || 60, (v) => send('config', { roundTime: v })),
       ];
 
+      if ((cfg.format || 'classic') === 'classic') {
+        rows.push(
+          mkPills(t('geo.cfgRounds'),
+            ROUND_COUNTS.map((n) => [n, String(n)]),
+            normalizeRounds(cfg.rounds || 5),
+            (v) => send('config', { rounds: v })),
+        );
+      }
+
       if (cfg.format === 'duel') {
         const hpOpts = [
           [3000, (3000).toLocaleString(locale())],
@@ -885,6 +921,7 @@ export default {
       const guessedSet = new Set(state.guessedMarks || []);
       const isDuel = state.format === 'duel';
       const isStreak = state.format === 'streak';
+      const canManageBots = state.status === 'waiting' && !!state.you?.mark;
       const seatRows = (state.seatOrder || []).map((m) => {
         const s = state.seats?.[m];
         const team = state.teams?.[m] || 'A';
@@ -895,12 +932,21 @@ export default {
             disabled: !!state.you?.mark,
             onclick: () => net.send(CHANNEL, 'sit'),
           }, t('geo.sit'));
+          const addBotBtn = canManageBots
+            ? h('button', {
+                type: 'button',
+                className: 'xs ghost geo-sit-btn',
+                title: t('geo.addBotTitle'),
+                onclick: () => send('add_bot', { mark: m, level: botLevelPick }),
+              }, '+ 🤖')
+            : null;
           return h('div', { className: 'geo-seat empty' }, [
             h('span', { className: 'muted small' },
               t('geo.seatLabel', { m })
               + (isDuel ? t('geo.teamTag', { team }) : '')
               + t('geo.emptyTag')),
             !state.you?.mark ? joinBtn : null,
+            addBotBtn,
           ].filter(Boolean));
         }
         const lbEntry = lbMap.get(m);
@@ -909,16 +955,25 @@ export default {
         const isOut = lbEntry ? !!lbEntry.eliminated : false;
         const isGuessed = guessedSet.has(m);
         const isMe = state.you?.mark === m;
+        const canSwitchTeam = isDuel && state.status === 'waiting' && (isMe || (s.bot && canManageBots));
         return h('div', { className: `geo-seat ${isMe ? 'me' : ''} ${isOut ? 'eliminated' : ''}` }, [
           isDuel ? h('span', { className: `geo-team-tag ${team === 'B' ? 'b' : 'a'}` }, team) : null,
           avatar(s.name, s.color, 26),
           h('span', { className: 'geo-seat-name' }, s.name + (isOut ? t('geo.stoppedTag') : '')),
-          isMe && isDuel && state.status === 'waiting'
+          canSwitchTeam
             ? h('button', {
                 type: 'button',
                 className: 'xs ghost geo-sit-btn',
-                onclick: () => send('switch_team'),
+                onclick: () => send('switch_team', s.bot ? { mark: m } : {}),
               }, t('geo.switchTeam'))
+            : null,
+          canManageBots && s.bot
+            ? h('button', {
+                type: 'button',
+                className: 'xs ghost geo-sit-btn',
+                title: t('geo.removeBotTitle'),
+                onclick: () => send('remove_bot', { mark: m }),
+              }, '✕')
             : null,
           state.phase === 'guessing'
             ? h('span', { className: `geo-guess-pill ${isGuessed ? 'done' : ''}` }, isGuessed ? '✓' : '⏳')
@@ -927,8 +982,24 @@ export default {
         ].filter(Boolean));
       });
 
+      const botLvlSelect = canManageBots
+        ? h('select', {
+            className: 'ludo-bot-lvl',
+            'aria-label': t('room.botLevelLabel'),
+            value: botLevelPick,
+            onchange: (e) => {
+              botLevelPick = e.target.value;
+              localStorage.setItem(`hub.level.${CHANNEL}`, botLevelPick);
+            },
+          },
+            h('option', { value: 'easy', selected: botLevelPick === 'easy' }, t('geo.botEasy')),
+            h('option', { value: 'normal', selected: botLevelPick === 'normal' }, t('geo.botNormal')),
+            h('option', { value: 'hard', selected: botLevelPick === 'hard' }, t('geo.botHard')))
+        : null;
+
       const seatHeader = h('div', { className: 'geo-seats-head' }, [
         h('span', {}, t('geo.playersHead', { n: state.seatedCount || 0 })),
+        botLvlSelect,
         state.you?.mark
           ? h('button', {
               type: 'button',
@@ -960,7 +1031,8 @@ export default {
       } else {
         const modeName = t('geo.mode.' + (state.mode || 'world'));
         const diffName = diffLabel(state.difficulty || 'global') || '';
-        card.append(h('h2', {}, t('geo.classicFinish', { diff: `${modeName} · ${diffName}` })));
+        const totalR = state.totalRounds || (state.roundHistory || []).length || 5;
+        card.append(h('h2', {}, t('geo.classicFinish', { total: totalR, diff: `${modeName} · ${diffName}` })));
       }
 
       const medals = ['🥇', '🥈', '🥉'];

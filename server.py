@@ -53,6 +53,7 @@ import hf_sync
 from chat import FILE_UPLOAD_MAX_BYTES, UPLOAD_MAX_BYTES, ChatError
 from flags_quiz import COUNTRIES as FLAGS_COUNTRIES
 from games import GameError, is_bot_uid
+from geoguessr import warm_all_sv_caches
 from hub import APPS, Hub
 
 HOST = "0.0.0.0"
@@ -162,6 +163,7 @@ async def keepalive_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     quiet_reset_errors(asyncio.get_running_loop())
+    warm_all_sv_caches()
     background = [
         asyncio.create_task(hub.prune_loop()),
         # Đồng hồ phòng: Sòng Bịp và Địa Đồ đếm lùi thời gian, đẩy chuyển pha tự động.
