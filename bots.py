@@ -353,6 +353,7 @@ def _registry() -> dict[str, type[Bot]]:
     from bot_poker import PokerBot
     from bot_ship import ShipBot
     from bot_xiangqi import XiangqiBot
+    from bot_zombie import ZombieBot
 
     return {
         CaroBot.CHANNEL: CaroBot,
@@ -364,6 +365,7 @@ def _registry() -> dict[str, type[Bot]]:
         FlagsBot.CHANNEL: FlagsBot,
         GeoBot.CHANNEL: GeoBot,
         LudoBot.CHANNEL: LudoBot,
+        ZombieBot.CHANNEL: ZombieBot,
     }
 
 
