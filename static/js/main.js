@@ -26,17 +26,18 @@ import pokerView from './views/poker.js';
 import geoView from './views/geo.js';
 import flagsView from './views/flags.js';
 import ludoView from './views/ludo.js';
+import zombieView from './views/zombie.js';
 import facesView from './views/faces.js';
 
 const VIEWS = {
   home: homeView, chat: chatView, caro: caroView, chess: chessView,
   xiangqi: xiangqiView, ship: shipView, bluff: bluffView, poker: pokerView,
-  geo: geoView, flags: flagsView, ludo: ludoView, faces: facesView,
+  geo: geoView, flags: flagsView, ludo: ludoView, zombie: zombieView, faces: facesView,
 };
 const NAV_ICON = {
   home: 'home', chat: 'chat', caro: 'caro', chess: 'chess',
   xiangqi: 'xiangqi', ship: 'ship', bluff: 'cards', poker: 'cards',
-  geo: 'globe', flags: 'flag', ludo: 'horse', faces: 'face',
+  geo: 'globe', flags: 'flag', ludo: 'horse', zombie: 'skull', faces: 'face',
 };
 
 const el = (id) => document.getElementById(id);
