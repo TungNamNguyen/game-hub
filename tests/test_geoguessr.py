@@ -15,10 +15,13 @@ from geoguessr import (
     GEO_DATA_PATH,
     LANDMARK_POOLS,
     LOCATION_POOLS,
+    STREETVIEW_BOX_META,
+    STREETVIEW_LAND_BOXES,
     GeoRoom,
     _DYNAMIC_SV_CACHE,
     _DYNAMIC_SV_LOCK,
     _pick_land_box,
+    enrich_location_metadata,
     is_sv_circuit_open,
     normalize_difficulty,
     probe_google_streetview,
@@ -318,3 +321,74 @@ def test_hub_geo_prefetch_offloads_to_thread_and_guards_loading_round():
         assert heartbeat_ticks >= 3
 
     asyncio.run(scenario())
+
+
+def test_rich_metadata_enrichment_no_bare_global_tag():
+    samples = [
+        {"lat": 28.2078, "lng": -177.3724, "name": "Midway Atoll (Toàn cầu 360°)", "country": "Midway Atoll"},
+        {"lat": 13.5122, "lng": 144.8035, "name": "", "country": "Guam"},
+        {"lat": -14.2738, "lng": -170.7021, "name": "Rte 001, Auto, Eastern District", "country": "American Samoa"},
+        {"lat": -16.2498, "lng": 168.1355, "name": "", "country": "Vanuatu"},
+        {"lat": -25.0667, "lng": -130.1000, "name": "", "country": "Quần đảo Pitcairn"},
+        {"lat": 21.2766, "lng": -157.8278, "name": "", "country": "Hawaii"},
+        {"lat": 21.0285, "lng": 105.8542, "name": "49 P. Lý Thái Tổ, Hà Nội", "country": "Việt Nam"},
+    ]
+    for loc in samples:
+        mode = "vietnam" if loc["country"] == "Việt Nam" else "oceania"
+        enriched = enrich_location_metadata(loc, mode)
+        assert "(Toàn cầu 360°)" not in enriched["name"], f"Bare suffix still present: {enriched}"
+        meta = enriched["meta"]
+        assert meta["country"]
+        assert meta["sovereign"]
+        assert meta["subregion"]
+        assert meta["coordsText"]
+        if loc["country"] == "Midway Atoll":
+            assert "Sand" in enriched["name"]
+            assert "Hoa Kỳ" in meta["sovereign"]
+            assert "Polynesia" in meta["subregion"]
+        if loc["country"] == "American Samoa":
+            assert "American Samoa" in enriched["name"]
+            assert "Tutuila" in meta["island"]
+
+    # Xác nhận match_view và round_history đều chứa target.meta
+    room = GeoRoom("META", "oceania")
+    room.join("u1", "GeoExplorer", "#38bdf8")
+    room.handle("u1", "config", {"difficulty": "landmark", "rounds": 5})
+    room.handle("u1", "start", {})
+    room.handle("u1", "guess", {"lat": -33.86, "lng": 151.21})
+    view = room.view("u1")
+    assert view["target"] is not None
+    assert "meta" in view["target"]
+    assert view["target"]["meta"]["coordsText"]
+    assert "meta" in room.round_history[0]["target"]
+
+
+def test_oceania_balanced_weights_landmarks_and_natural_random():
+    boxes = STREETVIEW_LAND_BOXES["oceania"]
+    total_w = sum(STREETVIEW_BOX_META[b][2] for b in boxes)
+    au_nz_w = sum(STREETVIEW_BOX_META[b][2] for b in boxes if STREETVIEW_BOX_META[b][0] in ("AU", "NZ"))
+    island_w = total_w - au_nz_w
+
+    au_nz_pct = au_nz_w / total_w
+    island_pct = island_w / total_w
+    assert 0.55 <= au_nz_pct <= 0.65, f"Expected AU+NZ ~60%, got {au_nz_pct:.2%}"
+    assert 0.35 <= island_pct <= 0.45, f"Expected Islands ~40%, got {island_pct:.2%}"
+
+    # Kho địa danh Oceania phải được mở rộng >= 140 điểm đã xác thực Pano 22 ký tự
+    oc_lms = LANDMARK_POOLS["oceania"]
+    assert len(oc_lms) >= 140, f"Expected >= 140 Oceania landmarks, got {len(oc_lms)}"
+    lm_countries = {x.get("country") for x in oc_lms}
+    assert "Hawaii" in lm_countries and "Guam" in lm_countries and "American Samoa" in lm_countries
+    for item in oc_lms:
+        assert len(item.get("pano", "")) == 22
+
+    # Kiểm tra lấy mẫu ngẫu nhiên với Soft Cooldown vẫn đa dạng quốc đảo và tự nhiên
+    recent: list[str] = []
+    seen_ccs: set[str] = set()
+    for _ in range(120):
+        _box, cc, _rad = _pick_land_box("oceania", recent_regions=recent)
+        seen_ccs.add(cc)
+        recent.append(cc)
+        if len(recent) > 6:
+            recent.pop(0)
+    assert len(seen_ccs) >= 8, f"Expected at least 8 Oceania territories sampled, got {seen_ccs}"
