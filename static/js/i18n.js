@@ -856,6 +856,18 @@ export const DICTS = {
     'ludo.draw': 'Hòa!',
     'ludo.winBanner': '🏆 {name} ({color}) chiến thắng!',
 
+    // Zombie Outbreak (Đêm Tử Thần)
+    'zombie.title': 'Đêm Tử Thần',
+    'zombie.blurb': 'Bắn súng sinh tồn Zombie Co-op 1–4 người & AI Bots: 6 vũ khí, 4 lớp Chiến Binh, 6 chủng Zombie + Boss, Trụ súng Sentry & Cứu đồng đội!',
+    'zombie.cfgTitle': 'Cấu hình Chiến dịch',
+    'zombie.cfgMap': 'Bản đồ',
+    'zombie.cfgDiff': 'Độ khó',
+    'zombie.diff.easy': 'Dễ',
+    'zombie.diff.normal': 'Thường',
+    'zombie.diff.hard': 'Khó (Ác mộng)',
+    'zombie.chooseClass': 'Chọn Lớp Chiến Binh',
+    'zombie.startBtn': 'Triển khai Chiến đấu',
+
     // Face Generator
     'faces.title': 'Tạo avatar',
     'faces.sec.faceHair': 'Khuôn mặt & Tóc',
@@ -1710,6 +1722,18 @@ export const DICTS = {
     'ludo.draw': 'Draw!',
     'ludo.winBanner': '🏆 {name} ({color}) wins!',
 
+    // Zombie Outbreak
+    'zombie.title': 'Zombie Outbreak',
+    'zombie.blurb': '1–4 player Co-op Survival Shooter with AI Bots: 6 weapons, 4 Survivor classes, 6 Special Infected + Bosses, Sentry Turrets & Team Revives!',
+    'zombie.cfgTitle': 'Mission Setup',
+    'zombie.cfgMap': 'Arena Map',
+    'zombie.cfgDiff': 'Difficulty',
+    'zombie.diff.easy': 'Easy',
+    'zombie.diff.normal': 'Normal',
+    'zombie.diff.hard': 'Nightmare',
+    'zombie.chooseClass': 'Choose Survivor Class',
+    'zombie.startBtn': 'Deploy Squad',
+
     // Face Generator
     'faces.title': 'Avatar Studio',
     'faces.sec.faceHair': 'Face & Hair',
@@ -1823,6 +1847,10 @@ const APP_META = {
     vi: ['Cờ Cá Ngựa', 'Đua ngựa 4 người, cản đường, Đá Hậu và leo chuồng 1–6'],
     en: ['Ludo (Cá Ngựa)', '4-player Aeroplane Chess with Blocking, Backward Kick & Home Climb'],
   },
+  zombie: {
+    vi: ['Đêm Tử Thần', 'Bắn súng sinh tồn Zombie Co-op 1–4 người, 6 vũ khí, Boss & Trụ súng'],
+    en: ['Zombie Outbreak', '1–4p Co-op Top-Down Zombie Shooter with 6 Weapons, Bosses & Turrets'],
+  },
   faces: {
     vi: ['Tạo avatar', 'Bấm một nút ra một mặt người mới, dùng làm ảnh đại diện'],
     en: ['Avatar Studio', 'Generate and customize procedural SVG/PNG avatars'],
@@ -1893,6 +1921,11 @@ const MODE_META = {
   ludo: {
     classic: { vi: 'Chuẩn (Xuất 1 & 6 · Đá Hậu)', en: 'Classic (Deploy 1 & 6 · Back Kick)' },
     strict: { vi: 'Cổ điển (Xuất 6 · Đá Hậu)', en: 'Strict (Deploy 6 · Back Kick)' },
+  },
+  zombie: {
+    outpost: { vi: 'Căn Cứ Bỏ Hoang (10 Đợt)', en: 'Abandoned Outpost (10 Waves)' },
+    lab: { vi: 'Phòng Thí Nghiệm Ngầm (15 Đợt)', en: 'Bio-Hazard Lab (15 Waves)' },
+    endless: { vi: 'Tử Thủ Vô Tận (Endless)', en: 'Blood Moon Endless' },
   },
 };
 
