@@ -35,8 +35,9 @@ from ludo import LudoRoom
 from poker import PokerRoom
 from poker_board import PokerBoard
 from xiangqi import XiangqiRoom
+from zombie import ZombieRoom
 
-GAME_CHANNELS = ("caro", "ship", "chess", "xiangqi", "bluff", "poker", "geo", "flags", "ludo")
+GAME_CHANNELS = ("caro", "ship", "chess", "xiangqi", "bluff", "poker", "geo", "flags", "ludo", "zombie")
 
 # Nhịp gọi ``room.tick()`` cho những phòng có đồng hồ riêng (Sòng Bịp, Địa Đồ,
 # Đố Cờ, Cờ Cá Ngựa). 0.2s giúp chuyển pha mượt mà mà vẫn nhẹ event loop.
@@ -72,6 +73,8 @@ APPS = [
      "desc": "Đoán tên nước từ quốc kỳ & thủ đô của 197 quốc gia"},
     {"id": "ludo", "name": "Cờ Cá Ngựa",
      "desc": "Đua ngựa 4 người, cản đường, Đá Hậu và leo chuồng 1–6"},
+    {"id": "zombie", "name": "Đêm Tử Thần",
+     "desc": "Bắn súng sinh tồn Zombie Co-op 1–4 người, 6 vũ khí, Boss & Trụ súng"},
     {"id": "faces", "name": "Tạo avatar",
      "desc": "Bấm một nút ra một mặt người mới, dùng làm ảnh đại diện"},
 ]
@@ -182,6 +185,7 @@ class Hub:
             "geo": RoomManager(GeoRoom),
             "flags": RoomManager(FlagsRoom),
             "ludo": RoomManager(LudoRoom),
+            "zombie": RoomManager(ZombieRoom),
         }
         self.chat = ChatStore(data_dir)
         self.avatars = AvatarStore(data_dir)
@@ -530,6 +534,9 @@ class Hub:
                 room.handle(uid, kind, msg, allow_live_fetch=False)
             else:
                 room.handle(uid, kind, msg)
+        # Gói input di chuyển liên tục của Zombie được phát đồng bộ theo nhịp 15 Hz ở fast_tick_loop
+        if channel == "zombie" and kind == "input":
+            return
         await self.broadcast_room(channel, code)
 
     # ---- chat -------------------------------------------------------------- #
@@ -739,9 +746,30 @@ class Hub:
             with contextlib.suppress(Exception):
                 await self._tick_once()
 
+    async def fast_tick_loop(self, every: float = 0.066) -> None:
+        """Nhịp mô phỏng thời gian thực 15 Hz cho các game hành động (Đêm Tử Thần).
+
+        Chỉ hoạt động khi có phòng ``FAST_TICK`` đang trong trận; lúc rảnh ngủ 0.25s để tiết kiệm CPU.
+        """
+        while True:
+            active_found = False
+            with contextlib.suppress(Exception):
+                for channel, manager in self.managers.items():
+                    if not getattr(manager.room_class, "FAST_TICK", False):
+                        continue
+                    for code, room in list(manager.rooms.items()):
+                        if not room.has_connection() or not room.in_progress():
+                            continue
+                        active_found = True
+                        if room.tick():
+                            await self.broadcast_room(channel, code)
+            await asyncio.sleep(every if active_found else 0.25)
+
     async def _tick_once(self) -> None:
         for channel, manager in self.managers.items():
             if not getattr(manager.room_class, "HAS_CLOCK", False):
+                continue
+            if getattr(manager.room_class, "FAST_TICK", False):
                 continue
             # list() vì broadcast có thể làm phòng bị xoá giữa lúc đang lặp.
             for code, room in list(manager.rooms.items()):
