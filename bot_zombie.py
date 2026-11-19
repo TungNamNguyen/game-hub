@@ -31,7 +31,7 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
 
     level = player.level if player.level in ("easy", "normal", "hard") else "normal"
 
-    # 1. Pha tiếp tế: tự mua vũ khí / máu / perk theo cấp độ
+    # 1. Pha tiếp tế: tự mua vũ khí / nâng cấp Mk.II-III / máu / perk theo cấp độ
     if room.phase == "shop":
         sv["vx"] = sv["vy"] = 0.0
         sv["firing"] = False
@@ -40,12 +40,26 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
                 room._buy_item(sv, "medkit")
             except Exception:
                 pass
-        buy_order = ("rifle", "railgun", "flamer", "shotgun", "smg") if level == "hard" else ("rifle", "shotgun", "smg")
+        if sv["armor"] < sv["maxArmor"] * 0.4 and sv["money"] >= 170 and level != "easy":
+            try:
+                room._buy_item(sv, "shield")
+            except Exception:
+                pass
+        buy_order = ("rifle", "launcher", "railgun", "flamer", "shotgun", "smg") if level == "hard" else ("rifle", "shotgun", "launcher", "smg")
         for wid in buy_order:
             if wid not in sv["weapons"] and sv["money"] >= WEAPONS[wid]["cost"]:
                 try:
                     room._buy_item(sv, wid)
                     break
+                except Exception:
+                    pass
+        # Nâng cấp vũ khí chính lên Mk.II / Mk.III nếu đủ tiền
+        if level != "easy":
+            cur_w = sv["weapon"]
+            cur_lv = room._weapon_lv(sv, cur_w)
+            if cur_w != "pistol" and cur_lv < 3 and sv["money"] >= room._weapon_upgrade_cost(cur_w, cur_lv):
+                try:
+                    room._buy_item(sv, f"upgrade:{cur_w}")
                 except Exception:
                     pass
         for perk in ("damage", "armor", "reload", "vamp"):
@@ -106,6 +120,17 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
                 repel_x += (dx / d) * 2.5
                 repel_y += (dy / d) * 2.5
 
+        # Ưu tiên né khẩn cấp vòng cảnh báo chiêu của Boss / Mini-Boss (Telegraphs)
+        in_telegraph = False
+        for tg in getattr(room, "telegraphs", ()):
+            dx = sv["x"] - tg["x"]
+            dy = sv["y"] - tg["y"]
+            d = math.hypot(dx, dy) or 1.0
+            if d < tg["radius"] + 38.0:
+                in_telegraph = True
+                repel_x += (dx / d) * 4.2
+                repel_y += (dy / d) * 4.2
+
         # Kéo nhẹ về giữa bản đồ để không bị dồn vào góc chết
         cx_dx = ARENA_W * 0.5 - sv["x"]
         cy_dy = ARENA_H * 0.5 - sv["y"]
@@ -128,6 +153,9 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
         rm = math.hypot(repel_x, repel_y)
         if rm > 0.15:
             move_x, move_y = repel_x / rm, repel_y / rm
+            if in_telegraph and sv["dashCd"] <= now and level != "easy":
+                sv["vx"], sv["vy"] = move_x, move_y
+                room._do_dash(sv, now)
 
     sv["vx"] = move_x
     sv["vy"] = move_y
@@ -137,10 +165,10 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
         sv["firing"] = False
         return
 
-    # Ưu tiên zombie gần nhất hoặc Special Infected
+    # Ưu tiên zombie gần nhất hoặc Special Infected / Mini-Boss / Boss
     def threat_score(z: dict) -> float:
         d = math.hypot(z["x"] - sv["x"], z["y"] - sv["y"])
-        prio = 0.75 if z["kind"] in ("runner", "spitter", "boss") else 1.0
+        prio = 0.70 if z["kind"] in ("runner", "spitter", "butcher", "queen", "boss", "titan") else 1.0
         return d * prio
 
     target = min(room.zombies, key=threat_score)
