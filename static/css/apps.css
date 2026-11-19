@@ -3283,22 +3283,37 @@ body.geo-stage-active *::selection {
   top: 52px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(440px, 86%);
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(24, 9, 15, 0.88);
-  border: 1px solid rgba(244, 63, 94, 0.6);
-  box-shadow: 0 8px 28px rgba(244, 63, 94, 0.25);
+  width: min(460px, 88%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   z-index: 6;
   pointer-events: none;
+}
+.z-boss-entry {
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(24, 9, 15, 0.9);
+  border: 1px solid rgba(244, 63, 94, 0.65);
+  box-shadow: 0 8px 28px rgba(244, 63, 94, 0.25);
+}
+.z-boss-entry.mini {
+  background: rgba(28, 16, 8, 0.9);
+  border-color: rgba(251, 146, 60, 0.65);
+  box-shadow: 0 6px 20px rgba(251, 146, 60, 0.2);
+}
+.z-boss-entry.enraged {
+  border-color: #fde047;
+  box-shadow: 0 0 24px rgba(244, 63, 94, 0.55);
 }
 .z-boss-label {
   font-size: 12px;
   font-weight: 800;
   color: #fda4af;
-  text-align: center;
-  margin-bottom: 5px;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
+}
+.z-boss-entry.mini .z-boss-label {
+  color: #fdba74;
 }
 .z-boss-bar {
   width: 100%;
@@ -3311,6 +3326,17 @@ body.geo-stage-active *::selection {
   height: 100%;
   background: linear-gradient(90deg, #e11d48, #fb7185);
   transition: width 0.12s linear;
+}
+.z-boss-fill.mini {
+  background: linear-gradient(90deg, #ea580c, #fb923c);
+}
+.z-boss-skill {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fde047;
+  text-align: center;
+  letter-spacing: 0.5px;
 }
 
 .zombie-bottom-hud {
@@ -3330,13 +3356,13 @@ body.geo-stage-active *::selection {
   pointer-events: auto;
   padding: 8px 12px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.84);
+  background: rgba(15, 23, 42, 0.86);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid rgba(148, 163, 184, 0.24);
   color: #f8fafc;
 }
 .z-vitals {
-  min-width: 185px;
+  min-width: 190px;
 }
 .z-bar {
   width: 100%;
@@ -3362,11 +3388,47 @@ body.geo-stage-active *::selection {
   gap: 6px;
   align-items: center;
 }
+.z-skill-btn {
+  position: relative;
+  overflow: hidden;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(30, 41, 59, 0.9);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 96px;
+}
+.z-skill-btn.ready {
+  border-color: rgba(74, 222, 128, 0.65);
+  color: #bbf7d0;
+}
+.z-skill-btn.cooling {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
+}
+.z-cd-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(56, 189, 248, 0.32);
+  pointer-events: none;
+}
+.z-cd-text {
+  position: relative;
+  z-index: 1;
+}
 .z-squad {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 165px;
+  min-width: 175px;
+}
+.z-squad.six-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(145px, 1fr));
+  gap: 4px 10px;
 }
 .z-squad-row {
   display: flex;
@@ -3380,11 +3442,26 @@ body.geo-stage-active *::selection {
   opacity: 0.5;
 }
 
+.z-wicon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.z-wsvg {
+  width: 54px;
+  height: 24px;
+  display: block;
+}
+.z-weapons .z-wsvg {
+  width: 42px;
+  height: 18px;
+}
+
 .zombie-shop-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(2, 6, 23, 0.74);
-  backdrop-filter: blur(6px);
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(7px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3392,15 +3469,96 @@ body.geo-stage-active *::selection {
   z-index: 12;
 }
 .zombie-shop-modal {
-  width: min(780px, 96%);
-  max-height: 90%;
+  width: min(880px, 96%);
+  max-height: 92%;
   overflow-y: auto;
-  border: 1px solid rgba(56, 189, 248, 0.38);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.zombie-shop-wgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.zombie-shop-wcard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.65);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+.zombie-shop-wcard.owned {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(20, 83, 45, 0.18);
+}
+.zombie-shop-wcard.equipped {
+  border-color: rgba(56, 189, 248, 0.75);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+.z-mk-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.22);
+  color: #7dd3fc;
+}
+.z-mk-badge.max {
+  background: rgba(232, 121, 249, 0.24);
+  color: #f0abfc;
+}
+.z-wcard-art {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+}
+.z-wcard-art .z-wsvg {
+  width: 72px;
+  height: 30px;
+}
+.z-wcard-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.z-wcard-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.z-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.z-stat-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  width: 28px;
+}
+.z-stat-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.z-stat-fill {
+  height: 100%;
+  border-radius: 999px;
 }
 .zombie-shop-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
   gap: 8px;
 }
 .zombie-shop-item {
