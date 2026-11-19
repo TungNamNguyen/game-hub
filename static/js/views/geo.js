@@ -1050,16 +1050,26 @@ export default {
         ].filter(Boolean))));
 
       const hist = h('div', { className: 'geo-history' },
-        (state.roundHistory || []).map((item) => h('div', { className: 'geo-hist-item' }, [
-          h('span', { className: 'geo-hist-round' }, t('geo.roundShort', { n: item.round })),
-          h('span', { className: 'geo-hist-name' }, item.target.name),
-          h('a', {
-            className: 'xs ghost geo-gmaps-link',
-            href: googleMapsPanoUrl(item.target.lat, item.target.lng),
-            target: '_blank',
-            rel: 'noopener noreferrer',
-          }, t('geo.openGmapsShort')),
-        ])));
+        (state.roundHistory || []).map((item) => {
+          const meta = item.target.meta || {};
+          const metaBits = [meta.subregion, meta.sovereign && meta.sovereign !== 'Quốc gia Độc lập' ? meta.sovereign : '', meta.coordsText]
+            .filter(Boolean);
+          return h('div', { className: 'geo-hist-item' }, [
+            h('span', { className: 'geo-hist-round' }, t('geo.roundShort', { n: item.round })),
+            h('div', { className: 'col grow', style: { gap: '2px', minWidth: '0' } }, [
+              h('span', { className: 'geo-hist-name' }, item.target.name),
+              metaBits.length
+                ? h('span', { className: 'tiny muted' }, metaBits.join(' · '))
+                : null,
+            ].filter(Boolean)),
+            h('a', {
+              className: 'xs ghost geo-gmaps-link',
+              href: googleMapsPanoUrl(item.target.lat, item.target.lng),
+              target: '_blank',
+              rel: 'noopener noreferrer',
+            }, t('geo.openGmapsShort')),
+          ]);
+        }));
 
       const actions = h('div', { className: 'row', style: { gap: '10px', marginTop: '14px' } });
       if (state.you?.mark) {
@@ -1212,6 +1222,24 @@ export default {
               }, t('geo.openGmaps')),
             ]),
           );
+          if (state.target.meta) {
+            const m = state.target.meta;
+            const chips = [];
+            if (m.country) chips.push(h('span', { className: 'chip accent' }, `🏳️ ${m.country}`));
+            if (m.sovereign && m.sovereign !== 'Quốc gia Độc lập') {
+              chips.push(h('span', { className: 'chip' }, `🏛️ ${m.sovereign}`));
+            }
+            if (m.island) chips.push(h('span', { className: 'chip' }, `🏝️ ${m.island}`));
+            if (m.subregion) chips.push(h('span', { className: 'chip' }, `🗺️ ${m.subregion}`));
+            if (m.nearestPlace) chips.push(h('span', { className: 'chip' }, `📍 ${m.nearestPlace}`));
+            if (m.coordsText) chips.push(h('span', { className: 'chip' }, `🧭 ${m.coordsText}`));
+            if (chips.length) {
+              revealCard.appendChild(h('div', {
+                className: 'row-wrap geo-meta-chips',
+                style: { gap: '6px', marginTop: '6px', marginBottom: '4px' },
+              }, chips));
+            }
+          }
           if (state.target.hint) {
             revealCard.appendChild(h('div', { className: 'geo-wg-reveal-sub' }, state.target.hint));
           }
