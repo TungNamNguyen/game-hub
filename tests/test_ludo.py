@@ -60,6 +60,17 @@ def test_host_manual_start_and_permissions():
     assert len(solo.bot_players()) == 1
 
 
+    # Kiểm tra khi ngựa chưa xuất chuồng và tung ra số không đi được (VD: 4) -> lastRoll & lastRolls vẫn lưu đúng
+    room.rng.randint = lambda a, b: 4
+    assert room.turn == "R"
+    room.handle("u1", "roll", {})
+    view = room.match_view("u1")
+    assert view["lastRoll"]["color"] == "R" and view["lastRoll"]["value"] == 4
+    assert view["lastRolls"]["R"] == 4
+    assert view["lastEvent"]["type"] == "nomove" and view["lastEvent"]["dice"] == 4
+    assert room.turn == "B"
+
+
 def test_blocking_kick_and_back_kick():
     room = LudoRoom("LD04", "classic")
     room.join("u1", "Red", "#111")
