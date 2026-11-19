@@ -552,6 +552,11 @@ function beep(freq, duration, peak = 0.12) {
 
 export const sfx = {
   move: () => beep(520, 0.08),
+  dice: () => {
+    beep(420, 0.035, 0.07);
+    setTimeout(() => beep(560, 0.035, 0.08), 55);
+    setTimeout(() => beep(680, 0.05, 0.09), 115);
+  },
   message: () => beep(660, 0.07, 0.09),
   hit: () => { beep(320, 0.1, 0.14); setTimeout(() => beep(220, 0.16, 0.12), 80); },
   miss: () => beep(180, 0.12, 0.09),
