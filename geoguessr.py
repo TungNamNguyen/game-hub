@@ -78,7 +78,7 @@ MODE_ISO_COUNTRIES: dict[str, set[str]] = {
     },
     "oceania": {
         "AU", "NZ", "FJ", "PG", "SB", "VU", "NC", "PF", "WS", "TO", "CK",
-        "GU", "MP", "AS", "PN", "UM", "CX", "CC", "NF",
+        "GU", "MP", "AS", "PN", "UM", "CX", "CC", "NF", "HI",
     },
 }
 
@@ -270,61 +270,76 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         # New Zealand — Đảo Bắc & Đảo Nam
         (-41.8, -34.6, 172.8, 178.4), # Đảo Bắc New Zealand (Auckland, Rotorua, Wellington)
         (-46.6, -40.8, 167.2, 174.2), # Đảo Nam New Zealand (Christchurch, Queenstown, Dunedin)
-        # Các quốc đảo & lãnh thổ hải ngoại Châu Đại Dương (đã xác thực có Street View 360° chính thức)
-        (13.26, 13.58, 144.65, 144.92),   # Guam (Tumon, Hagåtña, Umatac, Inarajan)
-        (15.10, 15.29, 145.69, 145.82),   # Saipan — Quần đảo Bắc Mariana
-        (14.94, 15.08, 145.58, 145.66),   # Tinian — Quần đảo Bắc Mariana
-        (14.12, 14.20, 145.13, 145.28),   # Rota — Quần đảo Bắc Mariana
-        (-14.37, -14.25, -170.84, -170.56), # American Samoa (Tutuila — Pago Pago, Tafuna, Leone)
-        (-16.28, -16.22, 168.10, 168.17), # Vanuatu (Đảo núi lửa Ambrym)
-        (-25.08, -25.05, -130.12, -130.08), # Quần đảo Pitcairn (Adamstown)
-        (28.19, 28.22, -177.39, -177.36), # Midway Atoll (Sand Island)
-        (-10.50, -10.41, 105.56, 105.71), # Đảo Christmas (Úc / Ấn Độ Dương)
-        (-12.20, -12.11, 96.81, 96.91),   # Quần đảo Cocos (Keeling)
-        (-36.06, -35.56, 136.53, 138.13), # Đảo Kangaroo (Nam Úc)
-        (-32.02, -31.99, 115.45, 115.56), # Đảo Rottnest (Tây Úc)
-        (-19.18, -19.10, 146.79, 146.88), # Đảo Magnetic (Queensland)
-        (-38.53, -38.44, 145.10, 145.36), # Đảo Phillip (Victoria)
-        (-43.49, -43.05, 147.17, 147.43), # Đảo Bruny (Tasmania)
-        (-40.15, -39.58, 143.82, 144.15), # Đảo King (Tasmania)
-        (-40.25, -39.72, 147.80, 148.35), # Đảo Flinders (Tasmania)
-        (-36.84, -36.75, 174.98, 175.18), # Đảo Waiheke (New Zealand)
-        (-46.96, -46.84, 168.05, 168.20), # Đảo Stewart / Rakiura (New Zealand)
+        # Các quốc đảo & lãnh thổ hải ngoại Châu Đại Dương (100% xác thực có Street View 360° chính thức)
+        (13.26, 13.58, 144.65, 144.92),     # Guam (Tumon, Hagåtña, Umatac, Inarajan)
+        (15.10, 15.29, 145.69, 145.82),     # Saipan — Quần đảo Bắc Mariana
+        (14.94, 15.08, 145.58, 145.66),     # Tinian — Quần đảo Bắc Mariana
+        (14.12, 14.20, 145.13, 145.28),     # Rota — Quần đảo Bắc Mariana
+        (-14.37, -14.25, -170.84, -170.56), # American Samoa — Đảo Tutuila (Pago Pago, Tafuna, Leone)
+        (-14.19, -14.15, -169.69, -169.60), # American Samoa — Quần đảo Manuʻa (Ofu & Olosega)
+        (-14.25, -14.20, -169.52, -169.42), # American Samoa — Quần đảo Manuʻa (Đảo Taʻū)
+        (21.25, 21.70, -158.25, -157.65),   # Hawaii (Polynesia) — Đảo Oahu
+        (20.62, 21.02, -156.68, -156.00),   # Hawaii (Polynesia) — Đảo Maui
+        (19.40, 20.15, -156.05, -154.90),   # Hawaii (Polynesia) — Đảo Lớn (Big Island)
+        (21.88, 22.23, -159.75, -159.30),   # Hawaii (Polynesia) — Đảo Kauai
+        (-16.28, -16.22, 168.10, 168.17),   # Vanuatu — Đảo núi lửa Ambrym
+        (-25.08, -25.05, -130.12, -130.08), # Quần đảo Pitcairn — Adamstown
+        (28.19, 28.22, -177.39, -177.36),   # Midway Atoll — Sand Island
+        (-10.50, -10.41, 105.56, 105.71),   # Đảo Christmas (Úc / Ấn Độ Dương)
+        (-12.20, -12.11, 96.81, 96.91),     # Quần đảo Cocos (Keeling)
+        (-36.06, -35.56, 136.53, 138.13),   # Đảo Kangaroo (Nam Úc)
+        (-32.02, -31.99, 115.45, 115.56),   # Đảo Rottnest (Tây Úc)
+        (-19.18, -19.10, 146.79, 146.88),   # Đảo Magnetic (Queensland)
+        (-38.53, -38.44, 145.10, 145.36),   # Đảo Phillip (Victoria)
+        (-43.49, -43.05, 147.17, 147.43),   # Đảo Bruny (Tasmania)
+        (-40.15, -39.58, 143.82, 144.15),   # Đảo King (Tasmania)
+        (-40.25, -39.72, 147.80, 148.35),   # Đảo Flinders (Tasmania)
+        (-36.84, -36.75, 174.98, 175.18),   # Đảo Waiheke (New Zealand)
+        (-46.96, -46.84, 168.05, 168.20),   # Đảo Stewart / Rakiura (New Zealand)
     ],
 }
 
-# Siêu dữ liệu (mã quốc gia mặc định, bán kính quét m, trọng số chọn khung) cho các khung đảo nhỏ
-# giúp: (1) không bị từ chối khi Google RPC bỏ trống country_code trên đảo, (2) bán kính ôm sát đảo
-# tránh rơi xuống đại dương, (3) phân bổ tỷ lệ cân đối giữa đất liền và quốc đảo.
+# Siêu dữ liệu (mã quốc gia mặc định, bán kính quét m, trọng số chọn khung) cho Châu Đại Dương:
+# Tổng trọng số = 100.0 -> Úc (38.0%) + New Zealand (22.0%) = 60.0%; Quốc đảo & Lãnh thổ = 40.0%.
 STREETVIEW_BOX_META: dict[tuple[float, float, float, float], tuple[str, int, float]] = {
-    (-38.5, -24.0, 140.5, 153.5): ("AU", 45000, 6.0),
-    (-24.0, -15.5, 144.5, 152.5): ("AU", 45000, 3.0),
-    (-43.5, -40.8, 144.8, 148.2): ("AU", 40000, 2.5),
-    (-35.5, -26.0, 134.0, 140.5): ("AU", 45000, 3.0),
-    (-35.0, -18.0, 114.5, 124.0): ("AU", 45000, 3.0),
-    (-25.0, -12.0, 129.5, 138.0): ("AU", 45000, 2.5),
-    (-41.8, -34.6, 172.8, 178.4): ("NZ", 40000, 4.5),
-    (-46.6, -40.8, 167.2, 174.2): ("NZ", 40000, 4.5),
-    (13.26, 13.58, 144.65, 144.92): ("GU", 9000, 2.0),
-    (15.10, 15.29, 145.69, 145.82): ("MP", 9000, 1.4),
-    (14.94, 15.08, 145.58, 145.66): ("MP", 8000, 0.7),
-    (14.12, 14.20, 145.13, 145.28): ("MP", 8000, 0.7),
-    (-14.37, -14.25, -170.84, -170.56): ("AS", 9000, 1.8),
-    (-16.28, -16.22, 168.10, 168.17): ("VU", 10000, 0.9),
-    (-25.08, -25.05, -130.12, -130.08): ("PN", 8000, 0.7),
-    (28.19, 28.22, -177.39, -177.36): ("UM", 6000, 0.7),
-    (-10.50, -10.41, 105.56, 105.71): ("CX", 8000, 0.9),
-    (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 0.8),
-    (-36.06, -35.56, 136.53, 138.13): ("AU", 15000, 0.9),
-    (-32.02, -31.99, 115.45, 115.56): ("AU", 6000, 0.8),
+    # Úc đất liền + 7 đảo ven bờ = 38.0%
+    (-38.5, -24.0, 140.5, 153.5): ("AU", 45000, 11.0),
+    (-24.0, -15.5, 144.5, 152.5): ("AU", 45000, 4.5),
+    (-43.5, -40.8, 144.8, 148.2): ("AU", 40000, 4.0),
+    (-35.5, -26.0, 134.0, 140.5): ("AU", 45000, 4.5),
+    (-35.0, -18.0, 114.5, 124.0): ("AU", 45000, 5.5),
+    (-25.0, -12.0, 129.5, 138.0): ("AU", 45000, 3.5),
+    (-36.06, -35.56, 136.53, 138.13): ("AU", 15000, 1.0),
+    (-32.02, -31.99, 115.45, 115.56): ("AU", 6000, 0.9),
     (-19.18, -19.10, 146.79, 146.88): ("AU", 8000, 0.7),
     (-38.53, -38.44, 145.10, 145.36): ("AU", 10000, 0.7),
     (-43.49, -43.05, 147.17, 147.43): ("AU", 12000, 0.7),
-    (-40.15, -39.58, 143.82, 144.15): ("AU", 15000, 0.6),
-    (-40.25, -39.72, 147.80, 148.35): ("AU", 15000, 0.6),
-    (-36.84, -36.75, 174.98, 175.18): ("NZ", 8000, 0.8),
-    (-46.96, -46.84, 168.05, 168.20): ("NZ", 10000, 0.7),
+    (-40.15, -39.58, 143.82, 144.15): ("AU", 15000, 0.5),
+    (-40.25, -39.72, 147.80, 148.35): ("AU", 15000, 0.5),
+    # New Zealand 2 đảo chính + 2 đảo ven bờ = 22.0%
+    (-41.8, -34.6, 172.8, 178.4): ("NZ", 40000, 10.5),
+    (-46.6, -40.8, 167.2, 174.2): ("NZ", 40000, 9.5),
+    (-36.84, -36.75, 174.98, 175.18): ("NZ", 8000, 1.0),
+    (-46.96, -46.84, 168.05, 168.20): ("NZ", 10000, 1.0),
+    # Quốc đảo & Lãnh thổ Thái Bình Dương / Ấn Độ Dương = 40.0%
+    (13.26, 13.58, 144.65, 144.92): ("GU", 9000, 5.5),
+    (15.10, 15.29, 145.69, 145.82): ("MP", 9000, 3.5),
+    (14.94, 15.08, 145.58, 145.66): ("MP", 8000, 1.5),
+    (14.12, 14.20, 145.13, 145.28): ("MP", 8000, 1.5),
+    (-14.37, -14.25, -170.84, -170.56): ("AS", 9000, 4.5),
+    (-14.19, -14.15, -169.69, -169.60): ("AS", 8000, 1.5),
+    (-14.25, -14.20, -169.52, -169.42): ("AS", 8000, 1.5),
+    (21.25, 21.70, -158.25, -157.65): ("HI", 10000, 2.5),
+    (20.62, 21.02, -156.68, -156.00): ("HI", 12000, 2.0),
+    (19.40, 20.15, -156.05, -154.90): ("HI", 15000, 2.0),
+    (21.88, 22.23, -159.75, -159.30): ("HI", 10000, 1.5),
+    (-16.28, -16.22, 168.10, 168.17): ("VU", 10000, 3.0),
+    (-25.08, -25.05, -130.12, -130.08): ("PN", 8000, 2.5),
+    (28.19, 28.22, -177.39, -177.36): ("UM", 6000, 2.0),
+    (-10.50, -10.41, 105.56, 105.71): ("CX", 8000, 2.5),
+    (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 2.5),
 }
+_MICRO_ISLAND_CCS = frozenset({"GU", "MP", "AS", "HI", "VU", "PN", "UM", "CX", "CC"})
 STREETVIEW_LAND_BOXES["world"] = [
     box
     for k in ("europe", "north_america", "south_america", "asia", "africa", "oceania")
@@ -352,13 +367,85 @@ REGION_ALIASES: dict[str, str] = {
     "ec": "Ecuador", "bo": "Bolivia", "uy": "Uruguay", "za": "Nam Phi", "eg": "Ai Cập",
     "ke": "Kenya", "tz": "Tanzania", "ug": "Uganda", "gh": "Ghana", "ng": "Nigeria",
     "sn": "Senegal", "bw": "Botswana", "na": "Namibia", "tn": "Tunisia", "ma": "Morocco",
-    "au": "Úc", "nz": "New Zealand", "pf": "French Polynesia",
+    "au": "Úc", "nz": "New Zealand", "pf": "French Polynesia", "hi": "Hawaii",
     "gu": "Guam", "mp": "Quần đảo Bắc Mariana", "as": "American Samoa",
     "vu": "Vanuatu", "pn": "Quần đảo Pitcairn", "um": "Midway Atoll",
     "cx": "Đảo Christmas", "cc": "Quần đảo Cocos", "nf": "Đảo Norfolk",
     "fj": "Fiji", "nc": "New Caledonia", "ws": "Samoa", "to": "Tonga",
     "ck": "Quần đảo Cook", "pg": "Papua New Guinea", "sb": "Quần đảo Solomon",
 }
+
+# Siêu dữ liệu địa lý chuẩn (Chủ quyền & Tiểu vùng địa lý) cho các quốc gia & lãnh thổ
+COUNTRY_GEO_INFO: dict[str, tuple[str, str]] = {
+    "Úc": ("Quốc gia Độc lập", "Australasia · Châu Đại Dương"),
+    "New Zealand": ("Quốc gia Độc lập", "Australasia / Polynesia · Châu Đại Dương"),
+    "Guam": ("Lãnh thổ Hải ngoại Hoa Kỳ", "Micronesia · Tây Thái Bình Dương"),
+    "Quần đảo Bắc Mariana": ("Thịnh vượng chung thuộc Hoa Kỳ", "Micronesia · Tây Thái Bình Dương"),
+    "American Samoa": ("Lãnh thổ Hải ngoại Hoa Kỳ", "Polynesia · Nam Thái Bình Dương"),
+    "Hawaii": ("Tiểu bang Hoa Kỳ", "Polynesia · Bắc Thái Bình Dương"),
+    "Vanuatu": ("Quốc gia Độc lập", "Melanesia · Nam Thái Bình Dương"),
+    "Quần đảo Pitcairn": ("Lãnh thổ Hải ngoại Anh", "Polynesia · Nam Thái Bình Dương"),
+    "Midway Atoll": ("Lãnh thổ Hải ngoại Hoa Kỳ", "Polynesia · Bắc Thái Bình Dương"),
+    "Đảo Christmas": ("Lãnh thổ Hải ngoại Úc", "Ấn Độ Dương · Châu Đại Dương"),
+    "Quần đảo Cocos": ("Lãnh thổ Hải ngoại Úc", "Ấn Độ Dương · Châu Đại Dương"),
+    "French Polynesia": ("Lãnh thổ Hải ngoại Pháp", "Polynesia · Nam Thái Bình Dương"),
+    "New Caledonia": ("Lãnh thổ Hải ngoại Pháp", "Melanesia · Nam Thái Bình Dương"),
+    "Fiji": ("Quốc gia Độc lập", "Melanesia · Nam Thái Bình Dương"),
+    "Samoa": ("Quốc gia Độc lập", "Polynesia · Nam Thái Bình Dương"),
+    "Tonga": ("Quốc gia Độc lập", "Polynesia · Nam Thái Bình Dương"),
+    "Việt Nam": ("Quốc gia Độc lập", "Đông Nam Á"),
+}
+
+# Danh mục địa danh / đảo / thị trấn chi tiết để bổ sung Metadata cho tọa độ thiếu tên đường:
+# (tên thị trấn/khu vực, tên đảo/bang, quốc gia/lãnh thổ, lat, lng, bán kính khớp km)
+GEO_GAZETTEER: tuple[tuple[str, str, str, float, float, float], ...] = (
+    # Guam
+    ("Vịnh Tumon (Tamuning)", "Đảo Guam", "Guam", 13.5122, 144.8035, 6.0),
+    ("Thủ phủ Hagåtña", "Đảo Guam", "Guam", 13.4763, 144.7502, 7.0),
+    ("Dededo (Bắc Guam)", "Đảo Guam", "Guam", 13.5178, 144.8391, 9.0),
+    ("Yigo (Cực Bắc Guam)", "Đảo Guam", "Guam", 13.5361, 144.8886, 10.0),
+    ("Làng cổ Umatac (Tây Nam Guam)", "Đảo Guam", "Guam", 13.2966, 144.6615, 8.0),
+    ("Làng Inarajan (Đông Nam Guam)", "Đảo Guam", "Guam", 13.2742, 144.7484, 9.0),
+    ("Vịnh Merizo (Cực Nam Guam)", "Đảo Guam", "Guam", 13.2658, 144.6691, 8.0),
+    ("Mangilao / Barrigada", "Đảo Guam", "Guam", 13.4480, 144.8010, 8.0),
+    # Northern Mariana Islands
+    ("Garapan & Micro Beach", "Đảo Saipan", "Quần đảo Bắc Mariana", 15.2072, 145.7186, 6.0),
+    ("Marpi & Vách đá Banzai Cliff", "Đảo Saipan", "Quần đảo Bắc Mariana", 15.2760, 145.8080, 7.0),
+    ("Capitol Hill / Mount Tapochau", "Đảo Saipan", "Quần đảo Bắc Mariana", 15.1890, 145.7460, 7.0),
+    ("Susupe / San Antonio (Nam Saipan)", "Đảo Saipan", "Quần đảo Bắc Mariana", 15.1350, 145.7060, 8.0),
+    ("Làng San Jose", "Đảo Tinian", "Quần đảo Bắc Mariana", 14.9698, 145.6228, 16.0),
+    ("Làng Songsong", "Đảo Rota", "Quần đảo Bắc Mariana", 14.1380, 145.1404, 18.0),
+    # American Samoa
+    ("Cảng Pago Pago (Eastern District)", "Đảo Tutuila", "American Samoa", -14.2756, -170.7020, 8.0),
+    ("Tafuna (Western District)", "Đảo Tutuila", "American Samoa", -14.3315, -170.7185, 8.0),
+    ("Làng cổ Leone", "Đảo Tutuila", "American Samoa", -14.3422, -170.7850, 8.0),
+    ("Đảo Ofu & Olosega", "Quần đảo Manuʻa", "American Samoa", -14.1720, -169.6400, 12.0),
+    ("Làng Luma / Faleasao", "Đảo Taʻū (Quần đảo Manuʻa)", "American Samoa", -14.2250, -169.4700, 15.0),
+    # Hawaii (Polynesia)
+    ("Honolulu / Waikiki", "Đảo Oahu", "Hawaii", 21.2900, -157.8400, 18.0),
+    ("Bờ biển North Shore (Haleiwa)", "Đảo Oahu", "Hawaii", 21.5928, -158.1034, 22.0),
+    ("Kahului / Wailuku", "Đảo Maui", "Hawaii", 20.8893, -156.4729, 25.0),
+    ("Road to Hana / Haleakalā", "Đảo Maui", "Hawaii", 20.7600, -156.1800, 28.0),
+    ("Kailua-Kona", "Đảo Lớn (Big Island)", "Hawaii", 19.6400, -155.9969, 45.0),
+    ("Thành phố Hilo", "Đảo Lớn (Big Island)", "Hawaii", 19.7241, -155.0868, 45.0),
+    ("Lihue / Kapaʻa / Waimea", "Đảo Kauai", "Hawaii", 22.0500, -159.5000, 35.0),
+    # Vanuatu, Pitcairn, Midway, Christmas, Cocos
+    ("Vành núi lửa Ambrym (Tỉnh Malampa)", "Đảo Ambrym", "Vanuatu", -16.2500, 168.1350, 25.0),
+    ("Thủ phủ Adamstown & Vịnh Bounty", "Đảo Pitcairn", "Quần đảo Pitcairn", -25.0667, -130.1000, 15.0),
+    ("Đảo Sand (Sand Island)", "Rạn san hô Midway", "Midway Atoll", 28.2072, -177.3735, 15.0),
+    ("Flying Fish Cove / Settlement", "Đảo Christmas", "Đảo Christmas", -10.4275, 105.6774, 22.0),
+    ("West Island / Home Island", "Quần đảo Cocos (Keeling)", "Quần đảo Cocos", -12.1872, 96.8280, 22.0),
+    # Australian & NZ Offshore Islands
+    ("Kingscote / Vivonne Bay", "Đảo Kangaroo (Nam Úc)", "Úc", -35.7800, 137.2100, 65.0),
+    ("Thomson Bay / Wadjemup", "Đảo Rottnest (Tây Úc)", "Úc", -32.0051, 115.5118, 12.0),
+    ("Nelly Bay / Horseshoe Bay", "Đảo Magnetic (Queensland)", "Úc", -19.1400, 146.8400, 12.0),
+    ("Cowes / Ventnor", "Đảo Phillip (Victoria)", "Úc", -38.4820, 145.2335, 18.0),
+    ("South Bruny / The Neck", "Đảo Bruny (Tasmania)", "Úc", -43.3200, 147.2900, 32.0),
+    ("Currie / Pearshape", "Đảo King (Tasmania)", "Úc", -39.8800, 143.9500, 40.0),
+    ("Whitemark / Memana", "Đảo Flinders (Tasmania)", "Úc", -40.0200, 148.0200, 45.0),
+    ("Oneroa / Palm Beach", "Đảo Waiheke (Auckland)", "New Zealand", -36.7910, 175.0481, 16.0),
+    ("Halfmoon Bay / Oban", "Đảo Stewart / Rakiura", "New Zealand", -46.8979, 168.1272, 30.0),
+)
 
 CURATED_LOCATIONS: dict[str, list[dict]] = {   'asia': [   {   'hint': 'Tháp truyền thông màu đỏ trắng biểu tượng Tokyo',
                     'image': 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Tokyo_Tower_2023.jpg/1280px-Tokyo_Tower_2023.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail',
@@ -682,17 +769,160 @@ _DYNAMIC_SV_CACHE: dict[str, list[dict]] = {m: [] for m in _ALL_GEO_MODES}
 _DYNAMIC_SV_INFLIGHT: set[str] = set()
 
 
-def _pick_land_box(mode: str) -> tuple[tuple[float, float, float, float], str, int]:
-    """Chọn một khung tọa độ theo trọng số (ưu tiên cân đối giữa đất liền và quốc đảo)."""
+def format_coords_dms(lat: float, lng: float) -> str:
+    """Định dạng tọa độ gọn đẹp dạng 28.2078°N, 177.3724°W."""
+    ns = "N" if lat >= 0 else "S"
+    ew = "E" if lng >= 0 else "W"
+    return f"{abs(lat):.4f}°{ns}, {abs(lng):.4f}°{ew}"
+
+
+def _lookup_gazetteer(lat: float, lng: float) -> tuple[str, str, str, float, str] | None:
+    """Tìm mục gần nhất trong GEO_GAZETTEER nếu tọa độ nằm trong bán kính khớp."""
+    best: tuple[float, tuple[str, str, str, float, float, float]] | None = None
+    for entry in GEO_GAZETTEER:
+        d = haversine_km(lat, lng, entry[3], entry[4])
+        if d <= entry[5] and (best is None or d < best[0]):
+            best = (d, entry)
+    if best is None:
+        return None
+    dist_km, (place_name, island_name, country_name, g_lat, g_lng, _) = best
+    _, dir_vi = compass_direction(g_lat, g_lng, lat, lng)
+    return place_name, island_name, country_name, dist_km, dir_vi
+
+
+def _infer_vietnam_subregion(lat: float, lng: float) -> str:
+    if lat >= 21.3 and lng < 105.0:
+        return "Tây Bắc Bộ · Việt Nam"
+    if lat >= 21.1 and lng >= 105.0:
+        return "Đông Bắc Bộ · Việt Nam"
+    if 19.9 <= lat < 21.3:
+        return "Đồng bằng sông Hồng · Việt Nam"
+    if 16.0 <= lat < 19.9:
+        return "Bắc Trung Bộ · Việt Nam"
+    if 11.4 <= lat < 16.0 and lng < 108.55:
+        return "Tây Nguyên · Việt Nam"
+    if 10.8 <= lat < 16.0:
+        return "Duyên hải Nam Trung Bộ · Việt Nam"
+    if 10.45 <= lat < 11.6 and lng >= 106.0:
+        return "Đông Nam Bộ · Việt Nam"
+    return "Đồng bằng sông Cửu Long · Việt Nam"
+
+
+def enrich_location_metadata(loc: dict, mode: str = "world") -> dict:
+    """Bổ sung đầy đủ siêu dữ liệu địa lý (Quốc gia, Chủ quyền, Tiểu vùng, Đảo/Bang, Điểm gần nhất, Tọa độ).
+
+    Đồng thời loại bỏ hoàn toàn hậu tố cụt lủn '(Toàn cầu 360°)' và đảm bảo tên địa điểm
+    luôn mang ngữ cảnh rõ ràng về Đảo/Vùng & Quốc gia.
+    """
+    lat = float(loc.get("lat", 0.0))
+    lng = float(loc.get("lng", 0.0))
+    raw_name = str(loc.get("name", "") or "").strip()
+    # Dọn các nhãn placeholder cũ nếu có
+    for suffix in ("(Toàn cầu 360°)", "(Châu Đại Dương 360°)"):
+        if raw_name.endswith(suffix):
+            raw_name = raw_name[: -len(suffix)].strip()
+
+    gaz = _lookup_gazetteer(lat, lng)
+    country = str(loc.get("country", "") or "").strip()
+    if country:
+        country = REGION_ALIASES.get(country.lower(), country)
+    if not country and gaz:
+        country = gaz[2]
+    if not country:
+        country = extract_region(loc, mode)
+
+    island = gaz[1] if gaz else ""
+    nearest_place = ""
+    if gaz:
+        p_name, _, _, dist_km, dir_vi = gaz
+        if dist_km <= 1.2:
+            nearest_place = p_name
+        else:
+            nearest_place = f"Gần {p_name} (~{dist_km:.1f} km về phía {dir_vi})"
+
+    sovereign, subregion = COUNTRY_GEO_INFO.get(country, ("Quốc gia Độc lập", ""))
+    if mode == "vietnam" or country == "Việt Nam":
+        sovereign = "Quốc gia Độc lập"
+        subregion = _infer_vietnam_subregion(lat, lng)
+    elif not subregion:
+        mode_sub = {
+            "asia": "Châu Á",
+            "europe": "Châu Âu",
+            "north_america": "Bắc Mỹ",
+            "south_america": "Nam Mỹ",
+            "africa": "Châu Phi",
+            "oceania": "Châu Đại Dương",
+        }.get(mode, "")
+        subregion = mode_sub
+
+    # Dựng tên hiển thị giàu ngữ cảnh (không bao giờ chỉ có 'Midway Atoll (Toàn cầu 360°)')
+    display_name = raw_name
+    if not display_name or display_name.lower() == country.lower():
+        if gaz:
+            p_name, isl_name, c_name, _, _ = gaz
+            if isl_name and isl_name.lower() not in p_name.lower() and isl_name.lower() != c_name.lower():
+                display_name = f"{p_name}, {isl_name} · {c_name}"
+            elif c_name.lower() not in p_name.lower():
+                display_name = f"{p_name} · {c_name}"
+            else:
+                display_name = p_name
+        else:
+            display_name = f"{country} ({subregion})" if subregion else (country or "Địa điểm 360°")
+    else:
+        # Nếu địa chỉ Google trả về chưa nhắc tên đảo/quốc gia -> gắn thêm cho rõ
+        low = display_name.lower()
+        extras: list[str] = []
+        if island and island.lower() not in low and island.lower() != country.lower():
+            # Tránh lặp nếu tên đảo chính đã nằm trong display_name (ví dụ 'Tasmania')
+            short_isl = island.split("(")[0].strip()
+            if short_isl.lower() not in low:
+                extras.append(short_isl)
+        if country and country.lower() not in low and country != "Việt Nam":
+            extras.append(country)
+        if extras:
+            if len(extras) == 2:
+                display_name = f"{display_name} ({extras[0]}) · {extras[1]}"
+            else:
+                display_name = f"{display_name} · {extras[0]}"
+
+    coords_text = format_coords_dms(lat, lng)
+    meta = {
+        "country": country,
+        "sovereign": sovereign,
+        "subregion": subregion,
+        "island": island,
+        "nearestPlace": nearest_place,
+        "coordsText": coords_text,
+    }
+    return {**loc, "name": display_name, "country": country, "meta": meta}
+
+
+def _pick_land_box(
+    mode: str,
+    recent_regions: list[str] | tuple[str, ...] | None = None,
+) -> tuple[tuple[float, float, float, float], str, int]:
+    """Chọn một khung tọa độ theo trọng số tự nhiên.
+
+    Với ``oceania``: Úc + New Zealand ~60%, các quốc đảo & lãnh thổ ~40%.
+    Nếu một đảo nhỏ vừa xuất hiện trong 3 vòng gần nhất (``recent_regions``),
+    giảm nhẹ trọng số của đảo đó (×0.35 — Soft Cooldown) để vẫn giữ tính random
+    tự nhiên mà tránh lặp liên tiếp cùng một đảo nhỏ.
+    """
     boxes = STREETVIEW_LAND_BOXES.get(mode) or STREETVIEW_LAND_BOXES["world"]
     default_radius = 18000 if mode == "vietnam" else 45000
+    recent_set = {r.upper() for r in (recent_regions or ())[-3:]}
     if mode == "oceania":
-        weights = [STREETVIEW_BOX_META.get(b, ("", default_radius, 1.0))[2] for b in boxes]
+        weights = []
+        for b in boxes:
+            cc, _, w = STREETVIEW_BOX_META.get(b, ("", default_radius, 1.0))
+            if cc in _MICRO_ISLAND_CCS and cc in recent_set:
+                w = max(0.2, w * 0.35)
+            weights.append(w)
         box = random.choices(boxes, weights=weights, k=1)[0]
     elif mode == "world":
         # Tránh các khung đảo nhỏ của oceania chiếm tỷ trọng quá lớn trong bản đồ thế giới
         weights = [
-            0.25 if (b in STREETVIEW_BOX_META and STREETVIEW_BOX_META[b][2] < 2.0) else 1.0
+            0.2 if (b in STREETVIEW_BOX_META and STREETVIEW_BOX_META[b][0] in _MICRO_ISLAND_CCS) else 1.0
             for b in boxes
         ]
         box = random.choices(boxes, weights=weights, k=1)[0]
@@ -771,20 +1001,30 @@ def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout
         return None
 
 
-def fetch_random_streetview(mode: str = "world", attempts: int = 6, timeout: float = 1.4) -> dict | None:
+def fetch_random_streetview(
+    mode: str = "world",
+    attempts: int = 6,
+    timeout: float = 1.4,
+    recent_regions: list[str] | tuple[str, ...] | None = None,
+) -> dict | None:
     """Sinh một tọa độ ngẫu nhiên trong vùng bản đồ rồi bắt dính đường Street View gần nhất."""
     if is_sv_circuit_open():
         return None
     for _ in range(attempts):
         if is_sv_circuit_open():
             return None
-        (lat_min, lat_max, lng_min, lng_max), default_cc, search_radius = _pick_land_box(mode)
+        (lat_min, lat_max, lng_min, lng_max), default_cc, search_radius = _pick_land_box(
+            mode, recent_regions=recent_regions
+        )
         lat = random.uniform(lat_min, lat_max)
         lng = random.uniform(lng_min, lng_max)
         res = probe_google_streetview(lat, lng, radius=search_radius, timeout=timeout)
         if res:
             raw_cc = (res.get("country_code") or "").strip().upper()
-            if not raw_cc and default_cc:
+            # Quần đảo Hawaii trong bản đồ Châu Đại Dương trả mã US -> gắn mã HI để phân tách với lục địa Mỹ
+            if default_cc == "HI" and raw_cc in ("", "US"):
+                raw_cc = "HI"
+            elif not raw_cc and default_cc:
                 raw_cc = default_cc
             if not is_valid_country_for_mode(mode, raw_cc, res.get("address", "")):
                 continue
@@ -795,18 +1035,19 @@ def fetch_random_streetview(mode: str = "world", attempts: int = 6, timeout: flo
                 region = REGION_ALIASES.get(cc, cc.upper())
             if not region:
                 region = infer_region_from_coords(s_lat, s_lng, mode)
-            label = res["address"] or (f"{region} (Toàn cầu 360°)" if region else "Toạ độ Street View toàn cầu")
-            return {
+            base_loc = {
                 "lat": s_lat,
                 "lng": s_lng,
                 "heading": res["heading"] or random.randint(0, 359),
                 "pano": res["pano"],
-                "name": label,
+                "name": res["address"],
                 "country": region,
-                "hint": "100% Google Street View ngẫu nhiên thời gian thực",
+                "cc": raw_cc,
+                "hint": "Google Street View 360° thời gian thực",
                 "dynamic": True,
                 "difficulty": "global",
             }
+            return enrich_location_metadata(base_loc, mode)
     return None
 
 
@@ -893,6 +1134,7 @@ class GeoRoom(SeatedRoom):
             m: ("A" if int(m) % 2 == 1 else "B") for m in self.SEATS
         }
         self.session_seen_coords: set[tuple[float, float]] = set()
+        self.session_recent_regions: list[str] = []
         self.loading_round: bool = False
         self.reset_match()
         # Nạp sẵn bộ đệm Street View ngay khi tạo phòng để bấm Bắt đầu vào 0ms
@@ -1122,15 +1364,29 @@ class GeoRoom(SeatedRoom):
             return 0
         return 0 if self._available_dynamic_cache_count() >= 1 else 1
 
+    def _record_recent_region(self, loc: dict) -> None:
+        cc = str(loc.get("cc") or "").strip().upper()
+        if not cc:
+            c_low = str(loc.get("country") or "").strip().lower()
+            for k, v in REGION_ALIASES.items():
+                if len(k) == 2 and v.lower() == c_low:
+                    cc = k.upper()
+                    break
+        if cc:
+            self.session_recent_regions.append(cc)
+            if len(self.session_recent_regions) > 8:
+                del self.session_recent_regions[:-8]
+
     def prefetch_dynamic_locations(self, count: int) -> None:
         """Chạy trong worker thread (``asyncio.to_thread``) để nạp tọa độ Google mà không chặn event loop."""
         if count <= 0 or is_sv_circuit_open():
             return
         mode = self.mode
+        recent = list(self.session_recent_regions[-3:])
         workers = max(1, min(5, count))
         try:
             with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="geo-async") as ex:
-                futs = [ex.submit(fetch_random_streetview, mode, 6, 1.5) for _ in range(count)]
+                futs = [ex.submit(fetch_random_streetview, mode, 6, 1.5, recent) for _ in range(count)]
                 for fut in futs:
                     try:
                         loc = fut.result(timeout=6.0)
@@ -1145,27 +1401,40 @@ class GeoRoom(SeatedRoom):
     def _draw_location(self, used_coords: set[tuple[float, float]], allow_live_fetch: bool = True) -> dict:
         if self._is_global_dynamic():
             picked: dict | None = None
+            recent_micro = {r for r in self.session_recent_regions[-3:] if r in _MICRO_ISLAND_CCS}
             with _DYNAMIC_SV_LOCK:
                 cache = _DYNAMIC_SV_CACHE.get(self.mode, [])
-                while cache:
-                    cand = cache.pop(0)
+                fallback_idx: int | None = None
+                for i, cand in enumerate(cache):
                     key = (cand["lat"], cand["lng"])
-                    if key not in used_coords and key not in self.session_seen_coords:
-                        picked = {**cand, "difficulty": "global"}
-                        break
+                    if key in used_coords or key in self.session_seen_coords:
+                        continue
+                    cc = str(cand.get("cc") or "").upper()
+                    if cc in recent_micro and fallback_idx is None:
+                        fallback_idx = i
+                        continue
+                    picked = {**cache.pop(i), "difficulty": "global"}
+                    break
+                if picked is None and fallback_idx is not None:
+                    picked = {**cache.pop(fallback_idx), "difficulty": "global"}
             warm_dynamic_sv_cache(self.mode, target_count=12)
             if picked is not None:
-                return picked
+                enriched = enrich_location_metadata(picked, self.mode)
+                self._record_recent_region(enriched)
+                return enriched
             # Nếu bộ đệm tạm cạn và circuit breaker đóng, gọi trực tiếp Google RPC trước khi lùi về dự phòng
             if allow_live_fetch and not is_sv_circuit_open():
                 for _ in range(2):
                     if is_sv_circuit_open():
                         break
-                    live = fetch_random_streetview(self.mode, attempts=6, timeout=1.5)
+                    live = fetch_random_streetview(
+                        self.mode, attempts=6, timeout=1.5, recent_regions=self.session_recent_regions
+                    )
                     if live:
                         key = (live["lat"], live["lng"])
                         if key not in used_coords and key not in self.session_seen_coords:
                             warm_dynamic_sv_cache(self.mode, target_count=12)
+                            self._record_recent_region(live)
                             return live
 
         pool = self._pool_for_config()
@@ -1178,7 +1447,10 @@ class GeoRoom(SeatedRoom):
         if not candidates:
             candidates = pool
         sampled = self._balanced_static_sample(candidates, 1)
-        return sampled[0] if sampled else random.choice(candidates)
+        chosen = sampled[0] if sampled else random.choice(candidates)
+        enriched = enrich_location_metadata(chosen, self.mode)
+        self._record_recent_region(enriched)
+        return enriched
 
     def _start_match(self, allow_live_fetch: bool = True) -> None:
         seated = self._seated_marks()
@@ -1255,7 +1527,9 @@ class GeoRoom(SeatedRoom):
 
         self.winner = ""
         self.reset_match()
-        self.deck = deck
+        self.deck = [enrich_location_metadata(item, self.mode) for item in deck]
+        for item in self.deck:
+            self._record_recent_region(item)
         self.total_rounds = target_len
         self.status = self.START_STATUS
         self.rematch.clear()
@@ -1483,6 +1757,7 @@ class GeoRoom(SeatedRoom):
 
         results.sort(key=lambda r: (-r["points"], r["distKm"] if r["distKm"] is not None else 999999.0))
         self.round_results = results
+        target_meta = target.get("meta") or enrich_location_metadata(target, self.mode).get("meta")
         self.round_history.append({
             "round": self.round_idx + 1,
             "target": {
@@ -1491,6 +1766,7 @@ class GeoRoom(SeatedRoom):
                 "lng": target["lng"],
                 "hint": target.get("hint", ""),
                 "image": target.get("image", ""),
+                "meta": target_meta,
             },
             "results": results,
             "duel": duel_summary,
@@ -1976,6 +2252,7 @@ class GeoRoom(SeatedRoom):
                 "lat": target["lat"],
                 "lng": target["lng"],
                 "hint": target.get("hint", ""),
+                "meta": target.get("meta") or enrich_location_metadata(target, self.mode).get("meta"),
             } if reveal_target else None,
             "duelSummary": self.last_duel_summary if self.phase in ("round_result", "finished") else None,
             "roundResults": self.round_results if self.phase in ("round_result", "finished") else [],
