@@ -1,6 +1,6 @@
-/* Đêm Tử Thần (Zombie Outbreak) — Game Bắn Súng Sinh Tồn Zombie Multiplayer 1–4 người Co-op & AI Bots.
- * Đồ họa 2.5D Tactical Canvas 60 FPS với Dynamic Flashlight, Particle VFX, Screen Shake,
- * 6 loại súng, 4 lớp Chiến Binh, 6 chủng Zombie + Boss, Cứu đồng đội & Cửa hàng tiếp tế.
+/* Đêm Tử Thần (Zombie Outbreak) — Game Bắn Súng Sinh Tồn Zombie Multiplayer 1–6 người Co-op & AI Bots.
+ * Đồ họa 2.5D Tactical Canvas 60 FPS với Instant Local Aim, Velocity Dead-Reckoning, Dynamic Flashlight,
+ * 7 loại vũ khí có thể nâng cấp Mk.I–Mk.III + SVG Icons, 4 lớp Chiến Binh, Mini-Boss & Boss Đột Biến.
  */
 
 import { avatar, clear, h, mount } from '../dom.js';
@@ -27,6 +27,55 @@ const PERK_DESC = {
   armor: '+30 HP tối đa · +45 Giáp',
   vamp: '+4 HP mỗi khi hạ Zombie',
 };
+
+const PERK_ICON = {
+  damage: '💥',
+  reload: '🔄',
+  speed: '👟',
+  armor: '🛡️',
+  vamp: '🩸',
+};
+
+const ITEM_ICON = {
+  medkit: '🩹',
+  ammo: '📦',
+  grenade: '💣',
+  turret: '🛰️',
+  shield: '🔰',
+  stim: '💉',
+};
+
+const WEAPON_SHORT = {
+  pistol: 'M1911',
+  smg: 'VECTOR',
+  shotgun: 'M870',
+  rifle: 'AK-47',
+  launcher: 'M79',
+  flamer: 'FLAMER',
+  railgun: 'RAILGUN',
+};
+
+/* ------------------------------------------- SVG Weapon Silhouette Icons -- */
+const WEAPON_SVG_MARKUP = {
+  pistol: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8h34v7H27l-3 10h-8l3-10h-5z" fill="currentColor" fill-opacity="0.22"/><path d="M27 15h6l-1 4h-5"/><line x1="48" y1="10" x2="54" y2="10"/></svg>`,
+  smg: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9h38v8H34l-2 9h-6l1-9H16l-2 7H9l2-7H8z" fill="currentColor" fill-opacity="0.22"/><line x1="46" y1="12" x2="58" y2="12"/><line x1="22" y1="6" x2="34" y2="6"/></svg>`,
+  shotgun: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15l12-4h40v4H34l-3 4H22l-4 5H6z" fill="currentColor" fill-opacity="0.22"/><rect x="33" y="15" width="14" height="4" rx="1" fill="currentColor" fill-opacity="0.45"/><line x1="56" y1="12" x2="60" y2="12"/></svg>`,
+  rifle: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l12-2h34v5H38l4 9h-6l-4-9h-6l-2 7h-5l1-7H14l-10 3z" fill="currentColor" fill-opacity="0.22"/><line x1="50" y1="12" x2="61" y2="12"/><line x1="26" y1="8" x2="36" y2="8"/></svg>`,
+  launcher: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l12-4h32v9H28l-3 5h-6l2-5h-5L6 21z" fill="currentColor" fill-opacity="0.22"/><rect x="26" y="8" width="26" height="9" rx="2" fill="currentColor" fill-opacity="0.32"/><circle cx="55" cy="12.5" r="2.5" fill="currentColor"/></svg>`,
+  flamer: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="9" width="32" height="10" rx="3" fill="currentColor" fill-opacity="0.22"/><rect x="16" y="19" width="16" height="6" rx="2" fill="currentColor" fill-opacity="0.4"/><line x1="42" y1="13" x2="54" y2="13"/><path d="M55 9c3 2 5 4 5 5s-2 3-5 5c1-2 1-4 0-5 1-1 1-3 0-5z" fill="#fb923c" stroke="#fb923c"/></svg>`,
+  railgun: `<svg viewBox="0 0 64 28" class="z-wsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h18l4-4h34v4H34v4h26v4H26l-4-4H16l-3 8H7l2-8H4z" fill="currentColor" fill-opacity="0.22"/><line x1="28" y1="14" x2="58" y2="14" stroke="#e0f2fe" stroke-width="2.5"/></svg>`,
+};
+
+function makeWeaponIcon(wid, color) {
+  const wrap = h('span', { class: 'z-wicon-wrap', style: { color: color || '#e2e8f0' } });
+  wrap.innerHTML = WEAPON_SVG_MARKUP[wid] || WEAPON_SVG_MARKUP.pistol;
+  return wrap;
+}
+
+function lerpAngle(a, b, f) {
+  let diff = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  return a + diff * f;
+}
 
 /* ------------------------------------------- WebAudio Procedural Combat SFX */
 let audioCtx = null;
@@ -58,6 +107,19 @@ function playGunSfx(weapon) {
       osc.connect(gain).connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.26);
+      return;
+    }
+    if (weapon === 'launcher') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.2);
       return;
     }
     if (weapon === 'flamer') {
@@ -121,6 +183,24 @@ function playBoomSfx() {
   } catch (_) {}
 }
 
+function playBuySfx(upgrade = false) {
+  const ctx = getAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = upgrade ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(upgrade ? 520 : 660, now);
+    osc.frequency.exponentialRampToValueAtTime(upgrade ? 1040 : 880, now + (upgrade ? 0.18 : 0.09));
+    gain.gain.setValueAtTime(0.11, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + (upgrade ? 0.2 : 0.1));
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  } catch (_) {}
+}
+
 /* ------------------------------------------- Offscreen Arena Floor Cache -- */
 function buildFloorCanvas(mode, w, h) {
   const c = document.createElement('canvas');
@@ -128,12 +208,11 @@ function buildFloorCanvas(mode, w, h) {
   c.height = h;
   const g = c.getContext('2d');
 
-  // Nền chính theo chủ đề bản đồ
-  const bg = mode === 'lab' ? '#0b141c' : mode === 'endless' ? '#160b0f' : '#11161d';
+  const bg = mode === 'lab' ? '#0a131b' : mode === 'endless' ? '#160a0e' : '#10151c';
   g.fillStyle = bg;
   g.fillRect(0, 0, w, h);
 
-  // Lưới gạch bê tông / sàn thép chiến thuật
+  // Lưới sàn chiến thuật
   const tile = 70;
   g.strokeStyle = mode === 'lab'
     ? 'rgba(34, 211, 238, 0.08)'
@@ -148,7 +227,7 @@ function buildFloorCanvas(mode, w, h) {
     g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke();
   }
 
-  // Vân nền ngẫu nhiên nhẹ (tạo cảm giác vật liệu thực tế)
+  // Vân nền ngẫu nhiên nhẹ
   let seed = mode === 'lab' ? 42 : mode === 'endless' ? 99 : 7;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -162,7 +241,7 @@ function buildFloorCanvas(mode, w, h) {
     g.fillRect(px, py, r * 2, r);
   }
 
-  // Vòng tròn sân đáp trực thăng / trung tâm chiến thuật
+  // Vòng tròn sân đáp trung tâm
   const cx = w * 0.5;
   const cy = h * 0.5;
   g.save();
@@ -183,7 +262,7 @@ function buildFloorCanvas(mode, w, h) {
   g.stroke();
   g.restore();
 
-  // Viền cảnh báo vàng-đen quanh chu vi bản đồ
+  // Viền cảnh báo quanh chu vi bản đồ
   g.strokeStyle = mode === 'lab' ? 'rgba(34,211,238,0.28)' : 'rgba(250,204,21,0.24)';
   g.lineWidth = 6;
   g.strokeRect(10, 10, w - 20, h - 20);
@@ -208,14 +287,26 @@ export default {
     let botLevelPick = localStorage.getItem(`hub.level.${CHANNEL}`) || 'normal';
     let shopOpen = false;
     let autoShopWave = -1;
+    let currentMatchId = -1;
     let lastEventSeq = 0;
     let lastLobbyKey = '';
     let lastHudKey = '';
+    let lastShopKey = '';
     let floorCache = { mode: '', canvas: null };
+
+    // Live 60 FPS cooldown trackers (synced from server, ticked smoothly every frame)
+    let localDashEndMs = 0;
+    let localDashTotal = 3.4;
+    let localReloadEndMs = 0;
+    let localReloadTotal = 1.2;
+    let dashFillEl = null;
+    let dashTextEl = null;
+    let shopTimerEl = null;
 
     // Entity interpolation & visual effects state
     const lerpSurv = new Map();
     const lerpZomb = new Map();
+    const lerpTurret = new Map();
     const tracers = [];
     const particles = [];
     const decals = [];
@@ -225,14 +316,35 @@ export default {
 
     // Local input state
     const keys = new Set();
+    let hasMouseMoved = false;
     let mouseScreenX = 0;
     let mouseScreenY = 0;
-    let mouseWorldX = 700;
+    let mouseWorldX = 760;
     let mouseWorldY = 450;
     let mouseDown = false;
     let touchMove = { vx: 0, vy: 0 };
 
     const send = (action, extra = {}) => net.send(CHANNEL, action, extra);
+
+    function resetMatchVisuals() {
+      decals.length = 0;
+      particles.length = 0;
+      tracers.length = 0;
+      floatTexts.length = 0;
+      shockwaves.length = 0;
+      lerpSurv.clear();
+      lerpZomb.clear();
+      lerpTurret.clear();
+      shakePower = 0;
+      autoShopWave = -1;
+      shopOpen = false;
+      lastHudKey = '';
+      lastShopKey = '';
+      lastEventSeq = 0;
+      localDashEndMs = 0;
+      localReloadEndMs = 0;
+      mouseDown = false;
+    }
 
     /* -------------------------------------------------- DOM Skeleton ----- */
     const lobbyWrap = h('div', { class: 'zombie-lobby-layout' });
@@ -260,13 +372,12 @@ export default {
     const bottomHud = h('div', { class: 'zombie-bottom-hud' });
     const shopOverlay = h('div', { class: 'zombie-shop-overlay hidden' });
 
-    // Mobile virtual action buttons (shown on touch devices via CSS)
     const touchControls = h('div', { class: 'zombie-touch-bar' },
       h('button', { type: 'button', class: 'z-tbtn', onclick: () => send('dash') }, '⚡ Dash'),
       h('button', { type: 'button', class: 'z-tbtn', onclick: () => send('grenade', { tx: mouseWorldX, ty: mouseWorldY }) }, '💣 Bom'),
-      h('button', { type: 'button', class: 'z-tbtn', onclick: () => send('turret') }, '🔫 Trụ'),
+      h('button', { type: 'button', class: 'z-tbtn', onclick: () => send('turret') }, '🛰️ Trụ'),
       h('button', { type: 'button', class: 'z-tbtn', onclick: () => send('reload') }, '🔄 Đạn'),
-      h('button', { type: 'button', class: 'z-tbtn', onclick: () => { shopOpen = !shopOpen; renderShopModal(); } }, '🛒 Shop'),
+      h('button', { type: 'button', class: 'z-tbtn', onclick: () => { shopOpen = !shopOpen; lastShopKey = ''; renderShopModal(); } }, '🛒 Shop'),
     );
 
     stageWrap.append(canvas, topHud, bossHud, bottomHud, touchControls, shopOverlay);
@@ -290,12 +401,16 @@ export default {
     }
 
     function addDecal(x, y, r, color) {
-      decals.push({ x, y, r, color, alpha: 0.55 });
-      if (decals.length > 85) decals.shift();
+      decals.push({ x, y, r, color, alpha: 0.52, life: 18.0, maxLife: 18.0 });
+      if (decals.length > 75) decals.shift();
     }
 
     function ingestEvents(events) {
-      if (!Array.isArray(events)) return;
+      if (!Array.isArray(events) || !events.length) return;
+      // Phòng hờ nếu server restart và seq nhỏ hơn lastEventSeq
+      if (events[events.length - 1].seq < lastEventSeq) {
+        lastEventSeq = 0;
+      }
       for (const ev of events) {
         if (!ev || ev.seq <= lastEventSeq) continue;
         lastEventSeq = ev.seq;
@@ -308,18 +423,18 @@ export default {
               x2: pt[0], y2: pt[1],
               color: ev.color || '#fde047',
               weapon: ev.weapon,
-              life: ev.weapon === 'railgun' ? 0.24 : ev.weapon === 'flamer' ? 0.14 : 0.08,
+              lv: ev.lv || 1,
+              life: ev.weapon === 'railgun' ? 0.24 : ev.weapon === 'flamer' ? 0.14 : 0.085,
               maxLife: ev.weapon === 'railgun' ? 0.24 : 0.10,
             });
           }
-          // Vỏ đạn văng ngang & tia lửa đầu nòng
           if (ev.weapon === 'flamer') {
             addParticles(ev.x, ev.y, 5, '#fb923c', 120, 260, 4, 8, 0.14, 0.28);
           } else {
             addParticles(ev.x, ev.y, ev.weapon === 'shotgun' ? 7 : 3, ev.color || '#fde047', 60, 180, 2, 4, 0.08, 0.18);
           }
           if (ev.mark === state?.you?.mark) {
-            if (ev.weapon === 'shotgun') shakePower = Math.max(shakePower, 6.5);
+            if (ev.weapon === 'shotgun' || ev.weapon === 'launcher') shakePower = Math.max(shakePower, 6.5);
             else if (ev.weapon === 'railgun') shakePower = Math.max(shakePower, 9.0);
             else if (ev.weapon === 'rifle') shakePower = Math.max(shakePower, 2.2);
             playGunSfx(ev.weapon);
@@ -336,20 +451,31 @@ export default {
             maxLife: 0.65,
           });
         } else if (ev.t === 'kill') {
-          const blood = ev.kind === 'bloater' || ev.kind === 'spitter' ? '#4ade80' : ev.kind === 'boss' ? '#f43f5e' : '#16a34a';
-          addDecal(ev.x, ev.y, ev.kind === 'boss' ? 42 : ev.kind === 'brute' ? 24 : 14, blood);
-          addParticles(ev.x, ev.y, ev.kind === 'boss' ? 35 : 14, blood, 60, 240, 3, 6.5, 0.25, 0.65);
-          if (ev.kind === 'boss') {
-            shockwaves.push({ x: ev.x, y: ev.y, r: 20, maxR: 220, color: '#f43f5e', life: 0.5, maxLife: 0.5 });
-            shakePower = Math.max(shakePower, 14);
+          const isBig = ev.kind === 'boss' || ev.kind === 'titan';
+          const isMini = ev.kind === 'butcher' || ev.kind === 'queen';
+          const blood = (ev.kind === 'bloater' || ev.kind === 'spitter' || ev.kind === 'queen')
+            ? '#4ade80'
+            : (isBig || ev.kind === 'butcher') ? '#f43f5e' : '#16a34a';
+          addDecal(ev.x, ev.y, isBig ? 44 : isMini ? 30 : ev.kind === 'brute' ? 24 : 14, blood);
+          addParticles(ev.x, ev.y, isBig ? 38 : isMini ? 24 : 14, blood, 60, 250, 3, 6.5, 0.25, 0.65);
+          if (isBig || isMini) {
+            shockwaves.push({ x: ev.x, y: ev.y, r: 20, maxR: isBig ? 230 : 150, color: blood, life: 0.5, maxLife: 0.5 });
+            shakePower = Math.max(shakePower, isBig ? 14 : 9);
             playBoomSfx();
           }
         } else if (ev.t === 'boom') {
-          addDecal(ev.x, ev.y, 44, '#1e293b');
+          addDecal(ev.x, ev.y, 40, '#1e293b');
           addParticles(ev.x, ev.y, 32, '#fb923c', 80, 340, 3, 8, 0.22, 0.65);
           addParticles(ev.x, ev.y, 18, '#fef08a', 40, 210, 2, 5, 0.16, 0.45);
           shockwaves.push({ x: ev.x, y: ev.y, r: 16, maxR: ev.radius || 135, color: '#fb923c', life: 0.35, maxLife: 0.35 });
-          shakePower = Math.max(shakePower, 13);
+          shakePower = Math.max(shakePower, 12);
+          playBoomSfx();
+        } else if (ev.t === 'slam' || ev.t === 'orbital') {
+          const col = ev.t === 'orbital' ? '#f43f5e' : '#fb923c';
+          addDecal(ev.x, ev.y, 34, '#3f121e');
+          addParticles(ev.x, ev.y, 26, col, 90, 300, 3, 7, 0.22, 0.55);
+          shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: ev.radius || 110, color: col, life: 0.38, maxLife: 0.38 });
+          shakePower = Math.max(shakePower, 10);
           playBoomSfx();
         } else if (ev.t === 'acid') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 12, maxR: ev.radius || 68, color: '#4ade80', life: 0.32, maxLife: 0.32 });
@@ -357,6 +483,13 @@ export default {
         } else if (ev.t === 'dash') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 8, maxR: 48, color: '#38bdf8', life: 0.22, maxLife: 0.22 });
           addParticles(ev.x, ev.y, 10, '#7dd3fc', 30, 120, 2, 4.5, 0.15, 0.32);
+        } else if (ev.t === 'upgrade') {
+          shockwaves.push({ x: ev.x, y: ev.y, r: 10, maxR: 65, color: '#e879f9', life: 0.4, maxLife: 0.4 });
+          floatTexts.push({ x: ev.x, y: ev.y - 26, text: `⚡ NÂNG CẤP Mk.${ev.lv}!`, color: '#e879f9', big: true, life: 1.0, maxLife: 1.0 });
+          if (ev.mark === state?.you?.mark) playBuySfx(true);
+        } else if (ev.t === 'stim') {
+          shockwaves.push({ x: ev.x, y: ev.y, r: 8, maxR: 60, color: '#22d3ee', life: 0.35, maxLife: 0.35 });
+          floatTexts.push({ x: ev.x, y: ev.y - 24, text: '💉 CUỒNG PHONG!', color: '#22d3ee', big: true, life: 0.9, maxLife: 0.9 });
         } else if (ev.t === 'revive') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 10, maxR: 85, color: '#4ade80', life: 0.45, maxLife: 0.45 });
           floatTexts.push({ x: ev.x, y: ev.y - 24, text: '💚 CỨU SỐNG!', color: '#4ade80', big: true, life: 1.1, maxLife: 1.1 });
@@ -365,7 +498,13 @@ export default {
           const col = ev.kind === 'med' ? '#4ade80' : ev.kind === 'ammo' ? '#38bdf8' : '#facc15';
           floatTexts.push({ x: ev.x, y: ev.y - 16, text: lbl, color: col, big: false, life: 0.85, maxLife: 0.85 });
         } else if (ev.t === 'wave') {
-          toast(ev.boss ? `⚠️ ĐỢT ${ev.wave} — CHÚA TỂ ĐỘT BIẾN XUẤT HIỆN!` : `☣️ Đợt ${ev.wave} bắt đầu!`, ev.boss ? 'danger' : 'ok');
+          if (ev.boss) {
+            toast(`⚠️ ĐỢT ${ev.wave} — BOSS ${ev.bossTitle || 'CHÚA TỂ'} XUẤT HIỆN!`, 'danger');
+          } else if (ev.miniBoss) {
+            toast(`🔥 ĐỢT ${ev.wave} — MINI-BOSS ${ev.bossTitle || 'TINH ANH'} XUẤT HIỆN!`, 'danger');
+          } else {
+            toast(`☣️ Đợt ${ev.wave} bắt đầu!`, 'ok');
+          }
         }
       }
     }
@@ -377,6 +516,7 @@ export default {
       const myMark = s.you?.mark || '';
       const seated = !!myMark;
       const myCls = (s.seatClasses || {})[myMark] || 'assault';
+      const maxSeats = s.maxSeats || (s.seatOrder || []).length || 6;
 
       clear(cfgCard);
       const mkPills = (label, opts, current, onPick) => h('div', { class: 'geo-cfg-row' },
@@ -416,16 +556,15 @@ export default {
           h('span', { class: 'small muted', style: { fontWeight: '600' } }, t('zombie.chooseClass')),
           classGrid),
         h('div', { class: 'tiny muted' },
-          '⌨️ WASD di chuyển · Chuột ngắm & bắn · 1–6 đổi súng · R thay đạn · Space Lướt né · G Lựu đạn · E Trụ súng · B Cửa hàng'),
+          '⌨️ WASD di chuyển · Chuột ngắm & bắn · 1–7 đổi súng · R thay đạn · Space Lướt né · G Lựu đạn · E Trụ súng · B Cửa hàng'),
         h('button', {
           type: 'button',
           class: 'primary',
           disabled: !seated,
           onclick: () => send('start'),
-        }, `🚀 ${t('zombie.startBtn')} (${s.seatedCount || 0}/4)`),
+        }, `🚀 ${t('zombie.startBtn')} (${s.seatedCount || 0}/${maxSeats})`),
       );
 
-      // Squad seats + Bot management
       clear(seatsCard);
       const botSelect = seated
         ? h('select', {
@@ -443,11 +582,11 @@ export default {
 
       seatsCard.append(
         h('div', { class: 'spread' },
-          h('div', { class: 'card-title', style: { margin: '0' } }, `Đội hình (${s.seatedCount || 0}/4)`),
+          h('div', { class: 'card-title', style: { margin: '0' } }, `Đội hình (${s.seatedCount || 0}/${maxSeats})`),
           botSelect),
       );
 
-      for (const m of (s.seatOrder || ['1', '2', '3', '4'])) {
+      for (const m of (s.seatOrder || ['1', '2', '3', '4', '5', '6'])) {
         const seat = s.seats?.[m];
         const clsId = (s.seatClasses || {})[m] || 'assault';
         const cm = CLASS_META[clsId] || CLASS_META.assault;
@@ -488,11 +627,12 @@ export default {
       mount(chatLobbySlot, roomChat(s, net, CHANNEL));
     }
 
-    /* ------------------------------------------- Armory Shop Modal ------- */
-    function renderShopModal() {
+    /* ------------------------------------------- Armory Shop Modal 2.0 --- */
+    function renderShopModal(force = false) {
       const s = state;
-      if (!s || !shopOpen || !s.inProgress && s.status !== 'playing') {
+      if (!s || !shopOpen || s.status !== 'playing') {
         shopOverlay.classList.add('hidden');
+        shopTimerEl = null;
         return;
       }
       const me = (s.survivors || []).find((x) => x.mark === s.you?.mark);
@@ -501,27 +641,93 @@ export default {
         return;
       }
       shopOverlay.classList.remove('hidden');
+
+      // Chỉ cập nhật text đếm ngược mà không phá hủy nút bấm khi dữ liệu mua sắm không đổi
+      const shopKey = JSON.stringify([
+        s.phase, s.wave, me.money, me.weapons, me.weaponLv, me.perks,
+        me.grenades, me.turrets, me.readyShop, Math.round(me.hp), Math.round(me.armor),
+      ]);
+      if (!force && shopKey === lastShopKey) {
+        if (shopTimerEl && s.phase === 'shop') {
+          shopTimerEl.textContent = me.readyShop ? 'Đã sẵn sàng…' : `Sẵn sàng ngay (${Math.ceil(s.shopLeft)}s)`;
+        }
+        return;
+      }
+      lastShopKey = shopKey;
       clear(shopOverlay);
 
       const cat = s.catalog || {};
-      const weaponOrder = cat.weaponOrder || ['pistol', 'smg', 'shotgun', 'rifle', 'flamer', 'railgun'];
+      const maxLv = cat.maxWeaponLv || 3;
+      const weaponOrder = cat.weaponOrder || ['pistol', 'smg', 'shotgun', 'rifle', 'launcher', 'flamer', 'railgun'];
 
-      const wGrid = h('div', { class: 'zombie-shop-grid' },
-        weaponOrder.filter((id) => id !== 'pistol').map((wid) => {
+      const mkStatBar = (label, pct, color) => h('div', { class: 'z-stat-row' },
+        h('span', { class: 'z-stat-lbl' }, label),
+        h('div', { class: 'z-stat-track' },
+          h('div', { class: 'z-stat-fill', style: { width: `${Math.max(8, Math.min(100, pct))}%`, background: color } })));
+
+      const wGrid = h('div', { class: 'zombie-shop-wgrid' },
+        weaponOrder.map((wid) => {
           const w = cat.weapons?.[wid];
           if (!w) return null;
           const owned = (me.weapons || []).includes(wid);
-          const cost = owned ? Math.max(80, Math.floor(w.cost / 3)) : w.cost;
-          const canBuy = me.money >= cost;
-          return h('button', {
-            type: 'button',
-            class: 'zombie-shop-item' + (owned ? ' owned' : ''),
-            disabled: !canBuy,
-            onclick: () => send('buy', { item: wid }),
-          },
-            h('strong', { style: { color: w.color } }, w.name),
-            h('span', { class: 'tiny muted' }, `DMG ${w.dmg} · Băng ${w.mag}`),
-            h('span', { class: 'chip ' + (canBuy ? 'ok' : '') }, owned ? `Nạp đầy $${cost}` : `Mua $${cost}`));
+          const curLv = (me.weaponLv || {})[wid] || 1;
+          const lvMult = 1 + 0.28 * (curLv - 1);
+          const effDmg = Math.round(w.dmg * (w.pellets || 1) * lvMult);
+          const dmgPct = (effDmg / 230) * 100;
+          const ratePct = ((1 / Math.max(0.08, w.rate || 0.25)) / 11) * 100;
+          const rangePct = ((w.range || 500) / 1000) * 100;
+
+          const refillCost = Math.max(80, Math.floor((w.cost || 0) / 3));
+          const upgCost = Math.round(Math.max(180, w.cost || 0) * (curLv === 1 ? 0.75 : 1.25));
+          const canBuyNew = !owned && me.money >= w.cost;
+          const canRefill = owned && wid !== 'pistol' && me.money >= refillCost;
+          const canUpgrade = owned && curLv < maxLv && me.money >= upgCost;
+
+          const actions = [];
+          if (!owned) {
+            actions.push(h('button', {
+              type: 'button',
+              class: 'xs ' + (canBuyNew ? 'primary' : 'ghost'),
+              disabled: !canBuyNew,
+              onclick: () => { send('buy', { item: wid }); playBuySfx(false); },
+            }, `Mua $${w.cost}`));
+          } else {
+            if (curLv < maxLv) {
+              actions.push(h('button', {
+                type: 'button',
+                class: 'xs ' + (canUpgrade ? 'primary' : 'ghost'),
+                disabled: !canUpgrade,
+                onclick: () => { send('buy', { item: `upgrade:${wid}` }); playBuySfx(true); },
+              }, `⬆ Mk.${curLv + 1} ($${upgCost})`));
+            } else {
+              actions.push(h('span', { class: 'chip ok' }, 'MAX Mk.3'));
+            }
+            if (wid !== 'pistol') {
+              actions.push(h('button', {
+                type: 'button',
+                class: 'xs ghost',
+                disabled: !canRefill,
+                onclick: () => { send('buy', { item: wid }); playBuySfx(false); },
+              }, `Nạp đạn $${refillCost}`));
+            }
+          }
+
+          return h('div', { class: 'zombie-shop-wcard' + (owned ? ' owned' : '') + (me.weapon === wid ? ' equipped' : '') },
+            h('div', { class: 'spread', style: { width: '100%', gap: '6px' } },
+              h('strong', { style: { color: w.color, fontSize: '13px' } }, w.name),
+              owned ? h('span', { class: 'z-mk-badge' + (curLv >= 3 ? ' max' : '') }, `Mk.${curLv}`) : null),
+            h('div', { class: 'z-wcard-art' },
+              makeWeaponIcon(wid, curLv >= 3 ? '#e879f9' : w.color),
+              h('div', { class: 'z-wcard-tags' },
+                w.splash > 0 ? h('span', { class: 'tiny', style: { color: '#f43f5e' } }, '💥 Nổ lan') : null,
+                w.burn > 0 ? h('span', { class: 'tiny', style: { color: '#fb923c' } }, '🔥 Thiêu đốt') : null,
+                w.pierce > 1 ? h('span', { class: 'tiny', style: { color: '#22d3ee' } }, `⚡ Xuyên ${w.pierce}`) : null,
+                (w.pellets || 1) > 1 ? h('span', { class: 'tiny', style: { color: '#fbbf24' } }, `×${w.pellets} tia`) : null)),
+            h('div', { class: 'z-wcard-stats' },
+              mkStatBar('DMG', dmgPct, w.color),
+              mkStatBar('TỐC', ratePct, '#38bdf8'),
+              mkStatBar('TẦM', rangePct, '#4ade80')),
+            h('div', { class: 'row', style: { gap: '6px', width: '100%', marginTop: '4px', flexWrap: 'wrap' } }, actions));
         }));
 
       const itemGrid = h('div', { class: 'zombie-shop-grid' },
@@ -531,9 +737,12 @@ export default {
             type: 'button',
             class: 'zombie-shop-item',
             disabled: !canBuy,
-            onclick: () => send('buy', { item: iid }),
+            onclick: () => { send('buy', { item: iid }); playBuySfx(false); },
           },
-            h('strong', {}, it.name),
+            h('div', { class: 'row', style: { gap: '6px', alignItems: 'center' } },
+              h('span', { style: { fontSize: '16px' } }, ITEM_ICON[iid] || '🧰'),
+              h('strong', { style: { fontSize: '12.5px' } }, it.name)),
+            it.desc ? h('span', { class: 'tiny muted' }, it.desc) : null,
             h('span', { class: 'chip ' + (canBuy ? 'ok' : '') }, `$${it.cost}`));
         }));
 
@@ -547,27 +756,31 @@ export default {
             type: 'button',
             class: 'zombie-shop-item' + (maxed ? ' owned' : ''),
             disabled: !canBuy,
-            onclick: () => send('buy', { item: pid }),
+            onclick: () => { send('buy', { item: pid }); playBuySfx(true); },
           },
-            h('strong', {}, `${pk.name} (Lv.${cur}/${pk.max})`),
+            h('div', { class: 'row', style: { gap: '6px', alignItems: 'center' } },
+              h('span', { style: { fontSize: '15px' } }, PERK_ICON[pid] || '⚡'),
+              h('strong', { style: { fontSize: '12.5px' } }, `${pk.name} (${cur}/${pk.max})`)),
             h('span', { class: 'tiny muted' }, PERK_DESC[pid] || ''),
             h('span', { class: 'chip ' + (canBuy ? 'ok' : '') }, maxed ? 'MAX' : `$${cost}`));
         }));
 
-      const headRight = h('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } },
-        h('span', { class: 'chip warn', style: { fontSize: '14px', fontWeight: '700' } }, `💰 $${me.money}`),
-        s.phase === 'shop'
-          ? h('button', {
-              type: 'button',
-              class: 'sm primary',
-              disabled: me.readyShop,
-              onclick: () => {
-                send('ready_shop');
-                shopOpen = false;
-                renderShopModal();
-              },
-            }, me.readyShop ? 'Đã sẵn sàng…' : `Sẵn sàng ngay (${Math.ceil(s.shopLeft)}s)`)
-          : null,
+      shopTimerEl = s.phase === 'shop'
+        ? h('button', {
+            type: 'button',
+            class: 'sm primary',
+            disabled: me.readyShop,
+            onclick: () => {
+              send('ready_shop');
+              shopOpen = false;
+              renderShopModal();
+            },
+          }, me.readyShop ? 'Đã sẵn sàng…' : `Sẵn sàng ngay (${Math.ceil(s.shopLeft)}s)`)
+        : null;
+
+      const headRight = h('div', { class: 'row', style: { gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+        h('span', { class: 'chip warn', style: { fontSize: '14px', fontWeight: '800' } }, `💰 $${me.money}`),
+        shopTimerEl,
         h('button', {
           type: 'button',
           class: 'sm ghost',
@@ -576,10 +789,10 @@ export default {
 
       shopOverlay.append(
         h('div', { class: 'zombie-shop-modal card col', style: { gap: '12px' } },
-          h('div', { class: 'spread' },
-            h('h2', {}, s.phase === 'shop' ? `🛒 Trạm Tiếp Tế — Đợt ${s.wave + 1} sắp bắt đầu` : '🛒 Kho Vũ Khí & Nâng Cấp'),
+          h('div', { class: 'spread', style: { gap: '8px', flexWrap: 'wrap' } },
+            h('h2', {}, s.phase === 'shop' ? `🛒 Trạm Tiếp Tế — Đợt ${s.wave + 1} sắp tới` : '🛒 Kho Vũ Khí & Nâng Cấp'),
             headRight),
-          h('div', { class: 'small muted', style: { fontWeight: '700' } }, '🔫 Vũ Khí'),
+          h('div', { class: 'small muted', style: { fontWeight: '700' } }, '🔫 Vũ Khí & Nâng Cấp Mk.I – Mk.III'),
           wGrid,
           h('div', { class: 'small muted', style: { fontWeight: '700' } }, '🧰 Tiếp Tế & Chiến Thuật'),
           itemGrid,
@@ -592,14 +805,44 @@ export default {
       const s = state;
       if (!s || s.status !== 'playing') return;
       const me = (s.survivors || []).find((x) => x.mark === s.you?.mark);
+
+      // Đồng bộ đồng hồ hồi chiêu Dash & Reload cho vòng lặp 60 FPS
+      if (me) {
+        const nowPerf = performance.now();
+        localDashTotal = me.dashTotal || 3.4;
+        if (me.dashReady > 0.05) {
+          const targetEnd = nowPerf + me.dashReady * 1000;
+          if (Math.abs(targetEnd - localDashEndMs) > 220) localDashEndMs = targetEnd;
+        } else {
+          localDashEndMs = 0;
+        }
+        if (me.reloading && me.reloadLeft > 0.05) {
+          localReloadTotal = me.reloadTotal || 1.2;
+          const targetRel = nowPerf + me.reloadLeft * 1000;
+          if (Math.abs(targetRel - localReloadEndMs) > 220) localReloadEndMs = targetRel;
+        } else {
+          localReloadEndMs = 0;
+        }
+      }
+
+      const bosses = s.bosses || (s.boss ? [s.boss] : []);
       const hudKey = JSON.stringify([
         s.phase, s.wave, s.zombiesLeft, s.totalKills, Math.ceil(s.shopLeft),
-        s.boss?.hp,
-        (s.survivors || []).map((x) => [x.mark, Math.round(x.hp), Math.round(x.armor), x.downed, x.alive, x.weapon, x.mag?.[x.weapon], x.reserve?.[x.weapon], x.money, x.grenades, x.turrets, x.reloading, x.dashReady > 0]),
+        bosses.map((b) => [b.id, Math.ceil(b.hp), b.enraged, b.skill]),
+        (s.survivors || []).map((x) => [
+          x.mark, Math.round(x.hp), Math.round(x.armor), x.downed, x.alive,
+          Math.ceil(x.bleedout || 0), x.weapon, (x.weaponLv || {})[x.weapon],
+          x.mag?.[x.weapon], x.reserve?.[x.weapon], x.money, x.grenades, x.turrets,
+          x.reloading, Math.ceil((x.dashReady || 0) * 10), x.stimLeft > 0,
+        ]),
       ]);
-      if (hudKey === lastHudKey) return;
+      if (hudKey === lastHudKey) {
+        if (shopOpen) renderShopModal();
+        return;
+      }
       lastHudKey = hudKey;
 
+      // Top HUD (chỉ còn 1 nút thoát chính là nút Lobby trên topbar chung!)
       clear(topHud);
       const waveLabel = s.maxWaves > 0 ? `ĐỢT ${s.wave} / ${s.maxWaves}` : `ĐỢT ${s.wave}`;
       topHud.append(
@@ -611,28 +854,36 @@ export default {
         h('button', {
           type: 'button',
           class: 'xs primary',
-          onclick: () => { shopOpen = !shopOpen; renderShopModal(); },
+          onclick: () => { shopOpen = !shopOpen; lastShopKey = ''; renderShopModal(true); },
         }, '🛒 Shop (B)'),
-        h('button', {
-          type: 'button',
-          class: 'xs ghost',
-          onclick: () => ctx.navigate(CHANNEL),
-        }, 'Thoát'),
       );
 
-      if (s.boss) {
+      // Boss & Mini-Boss Health Bars
+      if (bosses.length > 0) {
         bossHud.classList.remove('hidden');
-        const pct = Math.max(0, Math.min(100, (s.boss.hp / Math.max(1, s.boss.maxHp)) * 100));
-        mount(bossHud,
-          h('div', { class: 'z-boss-label' }, `☠️ CHÚA TỂ ĐỘT BIẾN — ${Math.ceil(s.boss.hp)} / ${Math.ceil(s.boss.maxHp)} HP`),
-          h('div', { class: 'z-boss-bar' }, h('div', { class: 'z-boss-fill', style: { width: `${pct}%` } })));
+        clear(bossHud);
+        for (const b of bosses) {
+          const pct = Math.max(0, Math.min(100, (b.hp / Math.max(1, b.maxHp)) * 100));
+          const tag = b.isMini ? '🔥 MINI-BOSS' : '☠️ BOSS CHÚA TỂ';
+          bossHud.append(
+            h('div', { class: 'z-boss-entry' + (b.isMini ? ' mini' : '') + (b.enraged ? ' enraged' : '') },
+              h('div', { class: 'spread', style: { gap: '8px', marginBottom: '4px' } },
+                h('span', { class: 'z-boss-label', style: { margin: '0' } }, `${tag}: ${b.title || 'Đột Biến'}${b.enraged ? ' ⚡ CUỒNG BẠO' : ''}`),
+                h('span', { class: 'tiny', style: { color: '#fecdd3', fontWeight: '700' } }, `${Math.ceil(b.hp)} / ${Math.ceil(b.maxHp)}`)),
+              h('div', { class: 'z-boss-bar' },
+                h('div', { class: 'z-boss-fill' + (b.isMini ? ' mini' : ''), style: { width: `${pct}%` } })),
+              b.skill ? h('div', { class: 'z-boss-skill' }, `⚠️ ĐANG VẬN CHIÊU: ${b.skill}`) : null));
+        }
       } else {
         bossHud.classList.add('hidden');
       }
 
       clear(bottomHud);
+      dashFillEl = null;
+      dashTextEl = null;
       if (me) {
         const wInfo = s.catalog?.weapons?.[me.weapon] || {};
+        const curLv = (me.weaponLv || {})[me.weapon] || 1;
         const curMag = me.mag?.[me.weapon] ?? 0;
         const curRes = me.reserve?.[me.weapon];
         const ammoStr = me.reloading ? 'ĐANG THAY ĐẠN…' : `${curMag} / ${curRes === -1 ? '∞' : (curRes ?? 0)}`;
@@ -641,37 +892,60 @@ export default {
 
         const vitals = h('div', { class: 'z-hud-box z-vitals' },
           h('div', { class: 'spread tiny' },
-            h('strong', {}, `❤️ HP ${Math.ceil(me.hp)}/${Math.ceil(me.maxHp)}`),
-            h('span', { style: { color: '#38bdf8' } }, `🛡️ ${Math.ceil(me.armor)}`)),
+            h('strong', {}, `❤️ ${Math.ceil(me.hp)}/${Math.ceil(me.maxHp)}`),
+            h('span', { style: { color: '#38bdf8', fontWeight: '700' } }, `🛡️ ${Math.ceil(me.armor)}`),
+            me.stimLeft > 0 ? h('span', { style: { color: '#22d3ee', fontWeight: '700' } }, `💉${Math.ceil(me.stimLeft)}s`) : null),
           h('div', { class: 'z-bar hp' }, h('div', { style: { width: `${hpPct}%` } })),
           h('div', { class: 'z-bar armor' }, h('div', { style: { width: `${arPct}%` } })));
 
         const weaponSlots = h('div', { class: 'z-hud-box z-weapons' },
-          h('div', { class: 'spread tiny' },
-            h('strong', { style: { color: wInfo.color || '#fde047' } }, wInfo.name || me.weapon),
-            h('strong', {}, ammoStr)),
-          h('div', { class: 'row', style: { gap: '4px', marginTop: '4px' } },
-            (me.weapons || []).map((wid, idx) => h('button', {
-              type: 'button',
-              class: 'xs ' + (wid === me.weapon ? 'primary' : 'ghost'),
-              onclick: () => send('switch', { weapon: wid }),
-            }, `${idx + 1}:${wid.toUpperCase()}`))));
+          h('div', { class: 'spread tiny', style: { gap: '8px' } },
+            h('div', { class: 'row', style: { gap: '6px', alignItems: 'center' } },
+              makeWeaponIcon(me.weapon, curLv >= 3 ? '#e879f9' : (wInfo.color || '#fde047')),
+              h('strong', { style: { color: wInfo.color || '#fde047' } }, `${wInfo.name || me.weapon}${curLv > 1 ? ` Mk.${curLv}` : ''}`)),
+            h('strong', { style: { color: me.reloading ? '#fbbf24' : '#f8fafc' } }, ammoStr)),
+          h('div', { class: 'row', style: { gap: '4px', marginTop: '5px', flexWrap: 'wrap' } },
+            (me.weapons || []).map((wid, idx) => {
+              const lv = (me.weaponLv || {})[wid] || 1;
+              return h('button', {
+                type: 'button',
+                class: 'xs ' + (wid === me.weapon ? 'primary' : 'ghost'),
+                onclick: () => send('switch', { weapon: wid }),
+              }, `${idx + 1}:${WEAPON_SHORT[wid] || wid.toUpperCase()}${lv > 1 ? `★${lv}` : ''}`);
+            })));
+
+        const dashPct = me.dashReady > 0 ? Math.min(100, (me.dashReady / Math.max(0.5, me.dashTotal || 3.4)) * 100) : 0;
+        dashFillEl = h('div', { class: 'z-cd-fill', style: { width: `${dashPct}%` } });
+        dashTextEl = h('span', { class: 'z-cd-text' }, me.dashReady <= 0 ? '⚡ Dash [Space]' : `⚡ ${me.dashReady.toFixed(1)}s`);
+        const dashBadge = h('button', {
+          type: 'button',
+          class: 'z-skill-btn' + (me.dashReady <= 0 ? ' ready' : ' cooling'),
+          onclick: () => send('dash'),
+        }, dashFillEl, dashTextEl);
 
         const tactical = h('div', { class: 'z-hud-box z-tactical' },
-          h('span', { class: 'chip warn' }, `💰 $${me.money}`),
-          h('span', { class: 'chip ' + (me.dashReady <= 0 ? 'ok' : '') }, me.dashReady <= 0 ? '⚡ Dash [Space]' : `⚡ ${me.dashReady}s`),
-          h('span', { class: 'chip' }, `💣 ×${me.grenades} [G]`),
-          h('span', { class: 'chip' }, `🔫 Trụ ×${me.turrets} [E]`));
+          h('span', { class: 'chip warn', style: { fontWeight: '800' } }, `💰 $${me.money}`),
+          dashBadge,
+          h('button', {
+            type: 'button',
+            class: 'z-skill-btn' + (me.grenades > 0 ? ' ready' : ''),
+            onclick: () => send('grenade', { tx: mouseWorldX, ty: mouseWorldY }),
+          }, h('span', { class: 'z-cd-text' }, `💣 ×${me.grenades} [G]`)),
+          h('button', {
+            type: 'button',
+            class: 'z-skill-btn' + (me.turrets > 0 ? ' ready' : ''),
+            onclick: () => send('turret'),
+          }, h('span', { class: 'z-cd-text' }, `🛰️ ×${me.turrets} [E]`)));
 
         bottomHud.append(vitals, weaponSlots, tactical);
       }
 
-      const squadBox = h('div', { class: 'z-hud-box z-squad' },
+      const squadBox = h('div', { class: 'z-hud-box z-squad' + ((s.survivors || []).length > 4 ? ' six-col' : '') },
         (s.survivors || []).map((sv) => h('div', { class: 'z-squad-row' + (sv.downed ? ' downed' : !sv.alive ? ' dead' : '') },
           h('span', { class: 'geo-dot', style: { background: sv.color } }),
-          h('span', { class: 'nowrap', style: { fontSize: '12px', fontWeight: sv.mark === s.you?.mark ? '700' : '500' } }, sv.name),
-          h('span', { class: 'tiny muted' }, sv.downed ? `🆘 ${sv.bleedout}s` : !sv.alive ? '💀' : `❤️${Math.ceil(sv.hp)}`),
-          h('span', { class: 'tiny', style: { color: '#facc15' } }, `💀${sv.kills}`))));
+          h('span', { class: 'nowrap', style: { fontSize: '11.5px', fontWeight: sv.mark === s.you?.mark ? '700' : '500', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis' } }, sv.name),
+          h('span', { class: 'tiny muted' }, sv.downed ? `🆘${Math.ceil(sv.bleedout)}s` : !sv.alive ? '💀' : `❤️${Math.ceil(sv.hp)}`),
+          h('span', { class: 'tiny', style: { color: '#facc15', marginLeft: 'auto' } }, `💀${sv.kills}`))));
       bottomHud.append(squadBox);
 
       if (shopOpen) renderShopModal();
@@ -731,9 +1005,10 @@ export default {
     }
 
     function updateMouseWorld() {
+      if (!hasMouseMoved) return;
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
       const cx = (mouseScreenX - rect.left) * dpr;
       const cy = (mouseScreenY - rect.top) * dpr;
       const { scale, ox, oy } = getTransform();
@@ -743,11 +1018,9 @@ export default {
 
     function drawObstacle25D(g, ob, mode, tSec) {
       const { x, y, w, h, kind } = ob;
-      // Đổ bóng 2.5D
       g.fillStyle = 'rgba(0,0,0,0.48)';
       g.fillRect(x + 8, y + 10, w, h);
 
-      // Thân khối
       if (kind === 'biotank') {
         const grad = g.createLinearGradient(x, y, x + w, y + h);
         grad.addColorStop(0, '#0f3d4c');
@@ -755,7 +1028,6 @@ export default {
         grad.addColorStop(1, '#164e63');
         g.fillStyle = grad;
         g.fillRect(x, y, w, h);
-        // Bọt sinh học phát sáng bên trong
         g.fillStyle = `rgba(34, 211, 238, ${0.28 + 0.14 * Math.sin(tSec * 3.2 + x)})`;
         g.fillRect(x + 8, y + 8, w - 16, h - 16);
         g.strokeStyle = '#22d3ee';
@@ -792,21 +1064,29 @@ export default {
       }
     }
 
-    function drawSurvivor(g, sv, sx, sy, tSec, isMe) {
+    function drawSurvivor(g, sv, sx, sy, aimAngle, tSec, isMe, nowMs) {
       g.save();
       g.translate(sx, sy);
 
       // Hào quang Quân Y (Medic)
       if (sv.cls === 'medic' && sv.alive && !sv.downed) {
-        g.strokeStyle = `rgba(74, 222, 128, ${0.18 + 0.08 * Math.sin(tSec * 4)})`;
+        g.strokeStyle = `rgba(74, 222, 128, ${0.16 + 0.08 * Math.sin(tSec * 4)})`;
         g.lineWidth = 2;
         g.beginPath();
         g.arc(0, 0, 140, 0, Math.PI * 2);
         g.stroke();
       }
 
+      // Hào quang Huyết Thanh Cuồng Phong (Stim)
+      if (sv.stimLeft > 0 && sv.alive && !sv.downed) {
+        g.strokeStyle = `rgba(34, 211, 238, ${0.45 + 0.25 * Math.sin(tSec * 10)})`;
+        g.lineWidth = 2.5;
+        g.beginPath();
+        g.arc(0, 0, 23, 0, Math.PI * 2);
+        g.stroke();
+      }
+
       if (sv.downed) {
-        // Vòng tròn SOS và tiến độ Cứu thương
         g.fillStyle = 'rgba(239, 68, 68, 0.22)';
         g.beginPath();
         g.arc(0, 0, 32 + Math.sin(tSec * 7) * 5, 0, Math.PI * 2);
@@ -825,13 +1105,13 @@ export default {
         }
       }
 
-      // Đèn pin chiến thuật (Flashlight Cone)
+      // Đèn pin chiến thuật (Flashlight Cone — xoay 60 FPS tức thì cho bản thân)
       if (sv.alive && !sv.downed) {
         g.save();
-        g.rotate(sv.aim);
+        g.rotate(aimAngle);
         const fl = g.createRadialGradient(14, 0, 6, 14, 0, 290);
-        fl.addColorStop(0, 'rgba(255, 250, 220, 0.24)');
-        fl.addColorStop(0.55, 'rgba(255, 245, 200, 0.08)');
+        fl.addColorStop(0, 'rgba(255, 250, 220, 0.22)');
+        fl.addColorStop(0.55, 'rgba(255, 245, 200, 0.07)');
         fl.addColorStop(1, 'rgba(255, 245, 200, 0)');
         g.fillStyle = fl;
         g.beginPath();
@@ -850,12 +1130,11 @@ export default {
 
       // Thân & vũ khí xoay theo góc ngắm
       g.save();
-      g.rotate(sv.aim);
+      g.rotate(aimAngle);
       if (sv.dashing) {
         g.shadowColor = '#38bdf8';
         g.shadowBlur = 16;
       }
-      // Vai áo giáp
       g.fillStyle = sv.downed ? '#64748b' : (sv.color || '#38bdf8');
       g.beginPath();
       g.roundRect(-12, -14, 22, 28, 8);
@@ -864,17 +1143,17 @@ export default {
       g.lineWidth = isMe ? 2.2 : 1.3;
       g.stroke();
 
-      // Hình dáng súng theo loại vũ khí đang cầm
       const wid = sv.weapon || 'pistol';
-      g.fillStyle = wid === 'railgun' ? '#22d3ee' : wid === 'flamer' ? '#f97316' : '#cbd5e1';
+      const wLv = (sv.weaponLv || {})[wid] || 1;
+      g.fillStyle = wLv >= 3 ? '#e879f9' : wid === 'railgun' ? '#22d3ee' : wid === 'flamer' ? '#f97316' : wid === 'launcher' ? '#f43f5e' : '#cbd5e1';
       if (wid === 'shotgun' || wid === 'rifle' || wid === 'railgun') {
         g.fillRect(6, -3, 24, 6);
         g.fillStyle = '#0f172a';
         g.fillRect(10, -2, 8, 4);
-      } else if (wid === 'flamer') {
-        g.fillRect(6, -4, 22, 8);
-        g.fillStyle = '#fbbf24';
-        g.fillRect(24, -3, 5, 6);
+      } else if (wid === 'flamer' || wid === 'launcher') {
+        g.fillRect(6, -4.5, 23, 9);
+        g.fillStyle = wid === 'launcher' ? '#fb7185' : '#fbbf24';
+        g.fillRect(24, -3.5, 5, 7);
       } else {
         g.fillRect(8, -2.5, 16, 5);
       }
@@ -887,6 +1166,16 @@ export default {
       g.fillStyle = CLASS_META[sv.cls]?.color || '#38bdf8';
       g.fillRect(4, -5, 5, 10);
       g.restore();
+
+      // Thanh tiến trình thay đạn (60 FPS) ngay trên đầu bản thân
+      if (isMe && localReloadEndMs > nowMs) {
+        const rem = Math.max(0, (localReloadEndMs - nowMs) / 1000);
+        const prog = 1 - Math.min(1, rem / Math.max(0.2, localReloadTotal));
+        g.fillStyle = 'rgba(0,0,0,0.7)';
+        g.fillRect(-20, 22, 40, 4);
+        g.fillStyle = '#fbbf24';
+        g.fillRect(-20, 22, 40 * prog, 4);
+      }
 
       // Thanh máu & tên trên đầu
       const barW = 36;
@@ -908,14 +1197,24 @@ export default {
       g.translate(zx, zy);
 
       const r = z.r || 16;
-      // Hào quang Boss hoặc Brute đang húc
-      if (z.kind === 'boss') {
-        const bg = g.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.9);
-        bg.addColorStop(0, 'rgba(244, 63, 94, 0.42)');
-        bg.addColorStop(1, 'rgba(244, 63, 94, 0)');
+      const isMajor = z.kind === 'boss' || z.kind === 'titan';
+      const isMini = z.kind === 'butcher' || z.kind === 'queen';
+
+      // Hào quang Boss / Mini-Boss / Enraged
+      if (isMajor || isMini) {
+        const auraCol = z.kind === 'queen'
+          ? 'rgba(52, 211, 153, 0.36)'
+          : z.kind === 'butcher'
+            ? 'rgba(251, 146, 60, 0.36)'
+            : z.enraged
+              ? 'rgba(244, 63, 94, 0.58)'
+              : 'rgba(244, 63, 94, 0.38)';
+        const bg = g.createRadialGradient(0, 0, r * 0.4, 0, 0, r * (z.enraged ? 2.2 : 1.85));
+        bg.addColorStop(0, auraCol);
+        bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
         g.fillStyle = bg;
         g.beginPath();
-        g.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+        g.arc(0, 0, r * (z.enraged ? 2.2 : 1.85), 0, Math.PI * 2);
         g.fill();
       } else if (z.charging) {
         g.strokeStyle = 'rgba(248, 113, 113, 0.85)';
@@ -931,36 +1230,56 @@ export default {
       g.ellipse(3, 5, r, r * 0.8, 0, 0, Math.PI * 2);
       g.fill();
 
-      // Màu thân theo chủng loại
       const palette = {
         walker: '#4d7c0f',
         runner: '#dc2626',
         bloater: '#65a30d',
         spitter: '#10b981',
         brute: '#7c2d12',
+        butcher: '#c2410c',
+        queen: '#0d9488',
         boss: '#9f1239',
+        titan: '#7f1d1d',
       };
       g.fillStyle = z.flash ? '#ffffff' : (palette[z.kind] || '#4d7c0f');
       const wobble = Math.sin(tSec * (z.kind === 'runner' ? 14 : 7) + z.id) * 1.4;
       g.beginPath();
       g.arc(0, wobble, r, 0, Math.PI * 2);
       g.fill();
-      g.strokeStyle = z.burn ? '#fb923c' : 'rgba(0,0,0,0.6)';
-      g.lineWidth = z.burn ? 3 : 2;
+      g.strokeStyle = z.enraged ? '#fde047' : z.burn ? '#fb923c' : isMini ? '#fed7aa' : 'rgba(0,0,0,0.6)';
+      g.lineWidth = (z.enraged || z.burn || isMajor) ? 3 : 2;
       g.stroke();
 
-      // Chi tiết đặc trưng: mụn axit Bloater, gai giáp Brute/Boss, mắt phát sáng
-      if (z.kind === 'bloater') {
+      // Chi tiết đặc trưng từng chủng
+      if (z.kind === 'bloater' || z.kind === 'queen') {
         g.fillStyle = `rgba(163, 230, 53, ${0.65 + 0.3 * Math.sin(tSec * 8 + z.id)})`;
         g.beginPath();
-        g.arc(-6, -4, 6, 0, Math.PI * 2);
-        g.arc(7, 4, 5, 0, Math.PI * 2);
+        g.arc(-r * 0.3, -r * 0.2, r * 0.24, 0, Math.PI * 2);
+        g.arc(r * 0.32, r * 0.18, r * 0.2, 0, Math.PI * 2);
         g.fill();
-      } else if (z.kind === 'boss' || z.kind === 'brute') {
-        g.fillStyle = '#fde047';
+      } else if (z.kind === 'butcher') {
+        // Lưỡi dao phay khổng lồ xoay cạnh Đao Đồ Tể
+        g.save();
+        g.rotate(tSec * 3.5 + z.id);
+        g.fillStyle = '#e2e8f0';
+        g.fillRect(r * 0.5, -5, 18, 10);
+        g.fillStyle = '#ef4444';
+        g.fillRect(r * 0.5 + 12, -5, 6, 10);
+        g.restore();
+      } else if (z.kind === 'titan') {
+        // Lõi năng lượng hạt nhân ở trung tâm Bạo Chúa
+        g.fillStyle = z.enraged ? '#fef08a' : '#fb7185';
         g.beginPath();
-        g.arc(-r * 0.28, -r * 0.15, z.kind === 'boss' ? 4.5 : 3, 0, Math.PI * 2);
-        g.arc(r * 0.28, -r * 0.15, z.kind === 'boss' ? 4.5 : 3, 0, Math.PI * 2);
+        g.arc(0, 0, r * 0.36 + Math.sin(tSec * 9) * 2.5, 0, Math.PI * 2);
+        g.fill();
+      }
+
+      if (isMajor || isMini || z.kind === 'brute') {
+        g.fillStyle = z.kind === 'queen' ? '#5eead4' : '#fde047';
+        const er = isMajor ? 4.8 : 3.2;
+        g.beginPath();
+        g.arc(-r * 0.28, -r * 0.18, er, 0, Math.PI * 2);
+        g.arc(r * 0.28, -r * 0.18, er, 0, Math.PI * 2);
         g.fill();
       } else {
         g.fillStyle = z.kind === 'runner' ? '#fef08a' : '#bef264';
@@ -970,14 +1289,13 @@ export default {
         g.fill();
       }
 
-      // Thanh máu (chỉ hiện khi đã bị thương hoặc là Brute/Boss)
-      if (z.hp < z.maxHp || z.kind === 'brute' || z.kind === 'boss') {
+      if (z.hp < z.maxHp || z.kind === 'brute' || isMini || isMajor) {
         const bw = Math.max(26, r * 1.7);
         const pct = Math.max(0, Math.min(1, z.hp / Math.max(1, z.maxHp)));
-        g.fillStyle = 'rgba(0,0,0,0.7)';
-        g.fillRect(-bw / 2, -r - 10, bw, 4);
-        g.fillStyle = z.kind === 'boss' ? '#f43f5e' : '#ef4444';
-        g.fillRect(-bw / 2, -r - 10, bw * pct, 4);
+        g.fillStyle = 'rgba(0,0,0,0.72)';
+        g.fillRect(-bw / 2, -r - 11, bw, 4.5);
+        g.fillStyle = isMajor ? '#f43f5e' : isMini ? '#fb923c' : '#ef4444';
+        g.fillRect(-bw / 2, -r - 11, bw * pct, 4.5);
       }
 
       g.restore();
@@ -989,7 +1307,19 @@ export default {
       lastFrameAt = nowMs;
       if (!state || state.status !== 'playing') return;
 
-      // Đồng bộ kích thước canvas sắc nét theo DPR
+      // Cập nhật thanh hồi chiêu Dash 60 FPS trực tiếp (không cần chờ server tick)
+      if (dashFillEl && dashTextEl) {
+        if (localDashEndMs > nowMs) {
+          const rem = (localDashEndMs - nowMs) / 1000;
+          const pct = Math.min(100, (rem / Math.max(0.5, localDashTotal)) * 100);
+          dashFillEl.style.width = `${pct.toFixed(1)}%`;
+          dashTextEl.textContent = `⚡ ${rem.toFixed(1)}s`;
+        } else if (dashFillEl.style.width !== '0%') {
+          dashFillEl.style.width = '0%';
+          dashTextEl.textContent = '⚡ Dash [Space]';
+        }
+      }
+
       const rect = stageWrap.getBoundingClientRect();
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const targetW = Math.max(320, Math.floor(rect.width * dpr));
@@ -1009,7 +1339,6 @@ export default {
       g2d.fillStyle = '#06090e';
       g2d.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Rung màn hình (Screen Shake)
       let sxOff = 0;
       let syOff = 0;
       if (shakePower > 0.1) {
@@ -1024,9 +1353,16 @@ export default {
       // 1. Mặt sàn
       g2d.drawImage(floorCache.canvas, 0, 0);
 
-      // 2. Vết máu & vết cháy nổ mờ dần
-      for (const d of decals) {
-        g2d.globalAlpha = d.alpha;
+      // 2. Vết máu & vết cháy nổ tự mờ dần theo thời gian
+      for (let i = decals.length - 1; i >= 0; i--) {
+        const d = decals[i];
+        d.life -= dt;
+        if (d.life <= 0) {
+          decals.splice(i, 1);
+          continue;
+        }
+        const fade = d.life < 4.0 ? (d.life / 4.0) : 1.0;
+        g2d.globalAlpha = d.alpha * fade;
         g2d.fillStyle = d.color;
         g2d.beginPath();
         g2d.arc(d.x, d.y, d.r, 0, Math.PI * 2);
@@ -1044,6 +1380,29 @@ export default {
         g2d.beginPath();
         g2d.arc(hz.x, hz.y, hz.r, 0, Math.PI * 2);
         g2d.fill();
+      }
+
+      // 3b. Vòng Cảnh Báo Chiêu Boss / Mini-Boss (Telegraph Danger Zones)
+      for (const tg of (state.telegraphs || [])) {
+        const prog = Math.max(0.05, Math.min(1, tg.prog || 0));
+        const col = tg.kind === 'orbital' ? '244, 63, 94' : '251, 146, 60';
+        g2d.save();
+        g2d.fillStyle = `rgba(${col}, ${0.12 + prog * 0.22})`;
+        g2d.beginPath();
+        g2d.arc(tg.x, tg.y, tg.r, 0, Math.PI * 2);
+        g2d.fill();
+        // Vòng nạp lực lan dần ra mép ngoài
+        g2d.fillStyle = `rgba(${col}, ${0.22 + prog * 0.25})`;
+        g2d.beginPath();
+        g2d.arc(tg.x, tg.y, tg.r * prog, 0, Math.PI * 2);
+        g2d.fill();
+        g2d.strokeStyle = `rgba(${col}, 0.92)`;
+        g2d.lineWidth = 2.5;
+        g2d.setLineDash([10, 6]);
+        g2d.beginPath();
+        g2d.arc(tg.x, tg.y, tg.r, 0, Math.PI * 2);
+        g2d.stroke();
+        g2d.restore();
       }
 
       // 4. Vật phẩm tiếp tế rơi trên sàn
@@ -1072,8 +1431,15 @@ export default {
         drawObstacle25D(g2d, ob, state.mode, tSec);
       }
 
-      // 6. Trụ súng Sentry tự động
+      // 6. Trụ súng Sentry tự động (nội suy góc mượt)
+      const activeTurrets = new Set();
       for (const tr of (state.turrets || [])) {
+        activeTurrets.add(tr.id);
+        let curAim = lerpTurret.get(tr.id);
+        if (curAim === undefined) curAim = tr.aim;
+        else curAim = lerpAngle(curAim, tr.aim, Math.min(1, dt * 16));
+        lerpTurret.set(tr.id, curAim);
+
         g2d.save();
         g2d.translate(tr.x, tr.y);
         g2d.strokeStyle = 'rgba(52, 211, 153, 0.14)';
@@ -1088,14 +1454,18 @@ export default {
         g2d.strokeStyle = '#34d399';
         g2d.lineWidth = 2;
         g2d.stroke();
-        g2d.rotate(tr.aim);
+        g2d.rotate(curAim);
         g2d.fillStyle = '#34d399';
         g2d.fillRect(0, -3.5, 20, 7);
         g2d.restore();
       }
+      for (const id of lerpTurret.keys()) {
+        if (!activeTurrets.has(id)) lerpTurret.delete(id);
+      }
 
-      // 7. Nội suy và vẽ Zombie
+      // 7. Nội suy Dead-Reckoning 60 FPS & vẽ Zombie
       const activeZIds = new Set();
+      const zBlend = 1 - Math.exp(-dt * 16);
       for (const z of (state.zombies || [])) {
         activeZIds.add(z.id);
         let cur = lerpZomb.get(z.id);
@@ -1103,9 +1473,11 @@ export default {
           cur = { x: z.x, y: z.y };
           lerpZomb.set(z.id, cur);
         } else {
-          const f = Math.min(1, dt * 16);
-          cur.x += (z.x - cur.x) * f;
-          cur.y += (z.y - cur.y) * f;
+          // Dự đoán vị trí theo vận tốc rồi hòa trộn mượt về vị trí chuẩn server
+          cur.x += (z.vx || 0) * dt * 0.55;
+          cur.y += (z.vy || 0) * dt * 0.55;
+          cur.x += (z.x - cur.x) * zBlend;
+          cur.y += (z.y - cur.y) * zBlend;
         }
         drawZombie(g2d, z, cur.x, cur.y, tSec);
       }
@@ -1113,27 +1485,34 @@ export default {
         if (!activeZIds.has(id)) lerpZomb.delete(id);
       }
 
-      // 8. Nội suy và vẽ Chiến binh
+      // 8. Nội suy Dead-Reckoning + Instant Local Aim & vẽ Chiến binh
       const activeMarks = new Set();
+      const sBlend = 1 - Math.exp(-dt * 18);
       for (const sv of (state.survivors || [])) {
         if (!sv.alive) continue;
         activeMarks.add(sv.mark);
+        const isMe = sv.mark === state.you?.mark;
         let cur = lerpSurv.get(sv.mark);
         if (!cur) {
-          cur = { x: sv.x, y: sv.y };
+          cur = { x: sv.x, y: sv.y, aim: sv.aim };
           lerpSurv.set(sv.mark, cur);
         } else {
-          const f = Math.min(1, dt * 18);
-          cur.x += (sv.x - cur.x) * f;
-          cur.y += (sv.y - cur.y) * f;
+          cur.x += (sv.vx || 0) * dt * 0.55;
+          cur.y += (sv.vy || 0) * dt * 0.55;
+          cur.x += (sv.x - cur.x) * sBlend;
+          cur.y += (sv.y - cur.y) * sBlend;
+          cur.aim = lerpAngle(cur.aim, sv.aim, sBlend);
         }
-        drawSurvivor(g2d, sv, cur.x, cur.y, tSec, sv.mark === state.you?.mark);
+        const renderAim = (isMe && hasMouseMoved && !sv.downed && !shopOpen)
+          ? Math.atan2(mouseWorldY - cur.y, mouseWorldX - cur.x)
+          : cur.aim;
+        drawSurvivor(g2d, sv, cur.x, cur.y, renderAim, tSec, isMe, nowMs);
       }
       for (const m of lerpSurv.keys()) {
         if (!activeMarks.has(m)) lerpSurv.delete(m);
       }
 
-      // 9. Đạn bay (Lựu đạn & Cầu axit)
+      // 9. Đạn bay (Lựu đạn, Đạn M79 Rocket, Cầu Axit & Plasma Boss)
       for (const pr of (state.projectiles || [])) {
         if (pr.kind === 'grenade') {
           const arcLift = Math.sin(Math.min(1, pr.t || 0) * Math.PI) * 34;
@@ -1145,6 +1524,22 @@ export default {
           g2d.beginPath();
           g2d.arc(pr.x, pr.y - arcLift, 6.5, 0, Math.PI * 2);
           g2d.fill();
+        } else if (pr.kind === 'rocket') {
+          g2d.fillStyle = '#fb7185';
+          g2d.shadowColor = '#f43f5e';
+          g2d.shadowBlur = 12;
+          g2d.beginPath();
+          g2d.arc(pr.x, pr.y, 6, 0, Math.PI * 2);
+          g2d.fill();
+          g2d.shadowBlur = 0;
+        } else if (pr.kind === 'plasma') {
+          g2d.fillStyle = '#f43f5e';
+          g2d.shadowColor = '#fb7185';
+          g2d.shadowBlur = 12;
+          g2d.beginPath();
+          g2d.arc(pr.x, pr.y, 6.5, 0, Math.PI * 2);
+          g2d.fill();
+          g2d.shadowBlur = 0;
         } else {
           g2d.fillStyle = '#4ade80';
           g2d.shadowColor = '#4ade80';
@@ -1168,10 +1563,10 @@ export default {
         g2d.save();
         g2d.globalAlpha = alpha;
         g2d.strokeStyle = tr.color;
-        g2d.lineWidth = tr.weapon === 'railgun' ? 6 * alpha : tr.weapon === 'flamer' ? 9 * alpha : 2.4;
-        if (tr.weapon === 'railgun') {
-          g2d.shadowColor = '#22d3ee';
-          g2d.shadowBlur = 16;
+        g2d.lineWidth = tr.weapon === 'railgun' ? 6.5 * alpha : tr.weapon === 'flamer' ? 9 * alpha : (tr.lv >= 3 ? 3.2 : 2.4);
+        if (tr.weapon === 'railgun' || tr.lv >= 3) {
+          g2d.shadowColor = tr.color;
+          g2d.shadowBlur = tr.weapon === 'railgun' ? 16 : 8;
         }
         g2d.beginPath();
         g2d.moveTo(tr.x1, tr.y1);
@@ -1219,7 +1614,7 @@ export default {
       }
       g2d.globalAlpha = 1;
 
-      // 12. Chữ sát thương bay lên (Floating Damage Numbers)
+      // 12. Chữ sát thương bay lên
       for (let i = floatTexts.length - 1; i >= 0; i--) {
         const ft = floatTexts[i];
         ft.life -= dt;
@@ -1239,8 +1634,8 @@ export default {
         g2d.restore();
       }
 
-      // 13. Đèn cảnh báo đỏ nhấp nháy 4 góc khi có Boss
-      if (state.boss) {
+      // 13. Đèn cảnh báo đỏ nhấp nháy 4 góc khi có Boss hoặc Mini-Boss
+      if ((state.bosses || []).length > 0 || state.boss) {
         const alarmAlpha = 0.12 + 0.10 * Math.abs(Math.sin(tSec * 4.5));
         for (const [bx, by] of [[30, 30], [aw - 30, 30], [30, ah - 30], [aw - 30, ah - 30]]) {
           const ag = g2d.createRadialGradient(bx, by, 5, bx, by, 140);
@@ -1253,8 +1648,8 @@ export default {
         }
       }
 
-      // 14. Tâm ngắm chiến thuật (Tactical Crosshair)
-      if (!shopOpen && state.you?.mark) {
+      // 14. Tâm ngắm chiến thuật
+      if (!shopOpen && state.you?.mark && hasMouseMoved) {
         g2d.save();
         g2d.translate(mouseWorldX, mouseWorldY);
         g2d.strokeStyle = mouseDown ? '#fb923c' : '#38bdf8';
@@ -1287,7 +1682,7 @@ export default {
       if (keys.has('KeyD') || keys.has('ArrowRight')) vx += 1;
       updateMouseWorld();
       const curPos = lerpSurv.get(me.mark) || me;
-      const aim = Math.atan2(mouseWorldY - curPos.y, mouseWorldX - curPos.x);
+      const aim = hasMouseMoved ? Math.atan2(mouseWorldY - curPos.y, mouseWorldX - curPos.x) : (me.aim || 0);
       send('input', {
         vx: Math.max(-1, Math.min(1, vx)),
         vy: Math.max(-1, Math.min(1, vy)),
@@ -1305,7 +1700,8 @@ export default {
         e.preventDefault();
         shopOpen = !shopOpen;
         if (shopOpen) mouseDown = false;
-        renderShopModal();
+        lastShopKey = '';
+        renderShopModal(true);
         return;
       }
       if (shopOpen) {
@@ -1322,7 +1718,10 @@ export default {
         send('reload');
       } else if (e.code === 'KeyG') {
         updateMouseWorld();
-        send('grenade', { tx: mouseWorldX, ty: mouseWorldY });
+        const me = (state.survivors || []).find((x) => x.mark === state.you.mark);
+        const tx = hasMouseMoved ? mouseWorldX : (me ? me.x + Math.cos(me.aim || 0) * 200 : 700);
+        const ty = hasMouseMoved ? mouseWorldY : (me ? me.y + Math.sin(me.aim || 0) * 200 : 450);
+        send('grenade', { tx, ty });
       } else if (e.code === 'KeyE') {
         send('turret');
       } else if (e.code.startsWith('Digit')) {
@@ -1333,12 +1732,14 @@ export default {
     };
     const onKeyUp = (e) => { keys.delete(e.code); };
     const onMouseMove = (e) => {
+      hasMouseMoved = true;
       mouseScreenX = e.clientX;
       mouseScreenY = e.clientY;
       updateMouseWorld();
     };
     const onMouseDown = (e) => {
       if (shopOpen) return;
+      hasMouseMoved = true;
       mouseScreenX = e.clientX;
       mouseScreenY = e.clientY;
       updateMouseWorld();
@@ -1371,6 +1772,12 @@ export default {
       if (!state) return;
       ctx.setTopbar(...roomTopbar(ctx, state, CHANNEL, t('zombie.title')));
 
+      // Khi bắt đầu ván mới (matchId đổi), dọn sạch xác/vết máu & đồng bộ lại event seq!
+      if (typeof state.matchId === 'number' && state.matchId !== currentMatchId) {
+        currentMatchId = state.matchId;
+        resetMatchVisuals();
+      }
+
       lobbyWrap.classList.toggle('hidden', state.status !== 'waiting');
       stageWrap.classList.toggle('hidden', state.status !== 'playing');
       finishWrap.classList.toggle('hidden', state.status !== 'finished');
@@ -1387,16 +1794,17 @@ export default {
 
       if (state.status === 'finished') {
         shopOpen = false;
+        mouseDown = false;
         renderFinish();
         return;
       }
 
-      // Tự mở cửa hàng tiếp tế khi vừa sang pha shop giữa đợt
       if (state.phase === 'shop' && autoShopWave !== state.wave) {
         autoShopWave = state.wave;
         shopOpen = true;
         mouseDown = false;
-        renderShopModal();
+        lastShopKey = '';
+        renderShopModal(true);
       } else if (state.phase === 'wave' && autoShopWave === state.wave - 1 && shopOpen) {
         shopOpen = false;
         renderShopModal();
