@@ -202,6 +202,28 @@ export const GAME_RULES = [
       'Đừng dồn quân đứng ngay trước mặt hoặc ngay sau lưng đối thủ khi không cần thiết.',
     ],
   },
+  {
+    id: 'zombie',
+    name: 'Đêm Tử Thần',
+    icon: 'skull',
+    players: '1–4 người Co-op (hoặc cùng Bot)',
+    goal: 'Phối hợp cùng đồng đội trụ vững qua các đợt Zombie & Boss Đột Biến bằng vũ khí, trụ súng Sentry, lựu đạn và kỹ năng nâng cấp.',
+    basics: [
+      'Di chuyển bằng phím WASD / Mũi tên, ngắm và giữ Chuột trái để bắn, phím 1–6 đổi súng, R thay đạn.',
+      'Space / Shift: Lướt né (Dash) miễn nhiễm sát thương trong 0.22s để thoát vòng vây.',
+      'Phím G (hoặc Chuột phải): Ném lựu đạn nổ diện rộng tới vị trí con trỏ. Phím E: Đặt Trụ Súng Tự Động Sentry.',
+      'Chọn 1 trong 4 Lớp Chiến Binh (Đặc Nhiệm, Quân Y, Công Binh, Thiết Giáp) trước khi vào trận.',
+    ],
+    specials: [
+      '6 Chủng Zombie: Xác Sống, Cuồng Nộ (chạy nhanh), Bụng Phệ (nổ vũng axit), Xạ Độc (bắn xa), Khổng Lồ (húc mạnh) và Chúa Tể Boss ở các đợt 5, 10, 15.',
+      'Cứu Đồng Đội (Downed & Revive): Khi hết máu bạn bị gục ngã 15s; đồng đội (hoặc Bot) đứng sát bên 2.5s sẽ vực bạn dậy!',
+      'Pha Tiếp Tế 12s giữa mỗi đợt (hoặc bấm phím B): Mua 6 loại súng (tới Phun Lửa & Railgun xuyên phá), Giáp, Máu, Trụ súng và 5 Perk vĩnh viễn.',
+    ],
+    tips: [
+      'Luôn giữ khoảng cách với Bụng Phệ (Bloater) để tránh dẫm phải vũng axit độc khi nó nổ.',
+      'Kết hợp Quân Y + Công Binh giúp đội vừa hồi máu liên tục vừa có lưới lửa trụ Sentry cực mạnh ở các đợt Boss.',
+    ],
+  },
 ];
 
 export const GAME_RULES_EN = [
@@ -395,6 +417,28 @@ export const GAME_RULES_EN = [
     ],
     tips: [
       'Watch enemies trailing 1–6 steps behind your horses — a matching roll unlocks a surprise Backward Kick!',
+    ],
+  },
+  {
+    id: 'zombie',
+    name: 'Zombie Outbreak',
+    icon: 'skull',
+    players: '1–4 players Co-op (or with AI Bots)',
+    goal: 'Survive escalating zombie waves and Mutant Bosses together using 6 weapons, auto-turrets, grenades, class abilities, and team revives.',
+    basics: [
+      'Move with WASD / Arrow keys, aim and hold Left-Click to fire, press 1–6 to switch weapons, R to reload.',
+      'Space / Shift: Tactical Dash with brief invulnerability to escape swarms.',
+      'Press G (or Right-Click) to throw a Frag Grenade; press E to deploy an automated Sentry Turret.',
+      'Pick from 4 Classes (Assault, Medic, Engineer, Vanguard) before deploying.',
+    ],
+    specials: [
+      '6 Infected Archetypes: Walkers, Runners, Acid Bloaters, Spitters, Charging Brutes, and Abomination Bosses every 5 waves.',
+      'Downed & Revive: Teammates (and AI Bots) can stand near a downed ally for 2.5s to revive them before the 15s bleedout timer ends.',
+      'Intermission Armory Shop (12s or press B): Buy new guns (up to Flamethrower & piercing Railgun), medkits, turrets, and 5 permanent Perks.',
+    ],
+    tips: [
+      'Focus down Spitters and Bloaters from a distance so acid pools do not cut off your kiting routes.',
+      'Railgun pierces through entire lines of zombies and shreds Bosses.',
     ],
   },
 ];
