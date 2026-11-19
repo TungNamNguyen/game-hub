@@ -66,6 +66,83 @@ function horseSvg(color) {
   return svg;
 }
 
+const DICE_PIPS = {
+  1: [5],
+  2: [3, 7],
+  3: [3, 5, 7],
+  4: [1, 3, 7, 9],
+  5: [1, 3, 5, 7, 9],
+  6: [1, 3, 4, 6, 7, 9],
+};
+const DICE_FACE_ROT = {
+  1: { x: 0, y: 0 },
+  2: { x: 0, y: -90 },
+  3: { x: -90, y: 0 },
+  4: { x: 90, y: 0 },
+  5: { x: 0, y: 90 },
+  6: { x: 0, y: 180 },
+};
+
+function createDice3D() {
+  const cube = h('div', { class: 'ludo-dice-cube' });
+  for (let face = 1; face <= 6; face++) {
+    const pips = new Set(DICE_PIPS[face]);
+    const isRed = face === 1 || face === 4;
+    const faceEl = h('div', { class: `ludo-dice-face f-${face}` });
+    for (let cell = 1; cell <= 9; cell++) {
+      faceEl.appendChild(
+        pips.has(cell)
+          ? h('span', { class: 'ludo-pip' + (isRed ? ' red' : '') + (face === 1 ? ' big' : '') })
+          : h('span', { class: 'ludo-pip-empty' }),
+      );
+    }
+    cube.appendChild(faceEl);
+  }
+  const shadow = h('div', { class: 'ludo-dice-shadow' });
+  const badge = h('span', { class: 'ludo-dice-val hidden' }, '');
+  const scene = h('div', { class: 'ludo-dice-scene' }, cube, shadow, badge);
+
+  let spinStep = 0;
+  let shownVal = 0;
+
+  function startSpin() {
+    scene.classList.add('is-rolling');
+    badge.classList.add('hidden');
+  }
+
+  function landOn(val, color = '', animate = true) {
+    const v = val >= 1 && val <= 6 ? val : 1;
+    shownVal = v;
+    scene.classList.remove('is-rolling');
+    scene.dataset.color = color || '';
+    const rot = DICE_FACE_ROT[v];
+    if (animate) {
+      spinStep += 2;
+      const rx = spinStep * 360 + rot.x;
+      const ry = (spinStep + (v % 2)) * 360 + rot.y;
+      cube.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+      scene.classList.remove('is-bouncing');
+      void scene.offsetWidth;
+      scene.classList.add('is-bouncing');
+    } else {
+      cube.style.transform = `rotateX(${rot.x}deg) rotateY(${rot.y}deg)`;
+    }
+    badge.textContent = String(v);
+    badge.className = 'ludo-dice-val' + (color ? ` c-${color}` : '') + (v === 6 ? ' six' : '');
+  }
+
+  function reset() {
+    shownVal = 0;
+    scene.classList.remove('is-rolling', 'is-bouncing');
+    scene.dataset.color = '';
+    cube.style.transform = 'rotateX(-22deg) rotateY(32deg)';
+    badge.classList.add('hidden');
+  }
+
+  reset();
+  return { node: scene, startSpin, landOn, reset, get value() { return shownVal; } };
+}
+
 function diceSvg(value) {
   const pips = {
     1: [[12, 12]],
@@ -122,6 +199,22 @@ function mountRoom(root, ctx, code) {
   const roomCardSlot = h('div', {});
   const chatSlot = h('div', {});
   const clockBadge = h('span', { class: 'ludo-clock hidden' });
+  const dice3D = createDice3D();
+  const diceWrapSlot = h('div', { class: 'ludo-dice-wrap' }, dice3D.node);
+  const playMetaSlot = h('div', { class: 'col grow', style: { gap: '3px', minWidth: '0' } });
+  const rollBtnSlot = h('div', { class: 'col' });
+  const movesBarSlot = h('div', { class: 'ludo-moves-bar hidden' });
+  const waitingBox = h('div', { class: 'col hidden', style: { gap: '10px' } });
+  const finishedBox = h('div', { class: 'col hidden', style: { gap: '10px' } });
+  const playingBox = h('div', { class: 'col hidden', style: { gap: '10px' } },
+    h('div', { class: 'spread', style: { gap: '12px' } },
+      h('div', { class: 'row grow', style: { gap: '14px', minWidth: '0' } },
+        diceWrapSlot,
+        playMetaSlot),
+      clockBadge),
+    rollBtnSlot,
+    movesBarSlot);
+  diceStage.append(waitingBox, playingBox, finishedBox);
 
   const mainCol = h('div', { class: 'ludo-main col' }, banner, boardBox, diceStage);
   const sideCol = h('div', { class: 'ludo-side col' },
@@ -177,7 +270,8 @@ function mountRoom(root, ctx, code) {
     if (!state || state.status !== 'playing' || state.phase !== 'roll' || state.turn !== state.you?.mark) return;
     if (btnEl) btnEl.disabled = true;
     optimisticRollPlayed = true;
-    sfx.move();
+    dice3D.startSpin();
+    sfx.dice();
     send('roll');
   }
 
@@ -270,13 +364,20 @@ function mountRoom(root, ctx, code) {
         },
       });
 
+      const lastRollOf = s.lastRolls?.[c] || 0;
       const header = h('div', { class: 'ludo-yard-head' },
         seat
-          ? h('div', { class: 'row', style: { gap: '5px', minWidth: '0' } },
+          ? h('div', { class: 'row grow', style: { gap: '5px', minWidth: '0' } },
               avatar(seat, 'sm'),
               h('span', { class: 'nowrap ludo-yard-name' },
                 (isHostSeat ? '👑 ' : '') + seat.name))
-          : h('span', { class: 'tiny muted' }, t('ludo.seatOpen', { color: colorName(c) })));
+          : h('span', { class: 'tiny muted grow' }, t('ludo.seatOpen', { color: colorName(c) })),
+        lastRollOf
+          ? h('span', {
+              class: `ludo-yard-roll c-${c}` + (s.lastRoll?.color === c ? ' latest' : ''),
+              title: t('ludo.rolledResult', { name: seat ? seat.name : colorName(c), dice: lastRollOf }),
+            }, `🎲${lastRollOf}`)
+          : null);
 
       const slots = h('div', { class: 'ludo-stable-slots' });
       for (let i = 0; i < 4; i++) {
@@ -302,15 +403,16 @@ function mountRoom(root, ctx, code) {
         }
         const key = `${r},${col}`;
 
-        // Ô trung tâm (7,7)
+        // Ô trung tâm (7,7) — luôn hiển thị mặt xúc xắc mới nhất (kể cả khi qua lượt vì chưa xuất chuồng)
         if (r === 7 && col === 7) {
-          const turnColor = s.status === 'playing' ? s.turn : '';
+          const shownDice = s.dice || s.lastRoll?.value || 0;
+          const rollerColor = s.dice ? s.turn : (s.lastRoll?.color || s.turn || '');
           const center = h('div', {
-            class: `ludo-center` + (turnColor ? ` c-${turnColor}` : ''),
+            class: `ludo-center` + (rollerColor ? ` c-${rollerColor}` : ''),
             style: { gridRow: '8', gridColumn: '8' },
           },
-            s.status === 'playing' && s.dice
-              ? h('div', { class: 'ludo-center-dice' }, diceSvg(s.dice))
+            s.status === 'playing' && shownDice
+              ? h('div', { class: 'ludo-center-dice' }, diceSvg(shownDice))
               : h('span', { class: 'ludo-center-star' }, '★'));
           boardBox.appendChild(center);
           continue;
@@ -392,17 +494,20 @@ function mountRoom(root, ctx, code) {
   function renderControls() {
     const s = state;
     if (!s) return;
-    clear(diceStage);
 
     const myColor = s.you?.mark || '';
     const isMyTurn = s.status === 'playing' && s.turn === myColor;
+
+    waitingBox.classList.toggle('hidden', s.status !== 'waiting');
+    playingBox.classList.toggle('hidden', s.status !== 'playing');
+    finishedBox.classList.toggle('hidden', s.status !== 'finished');
 
     if (s.status === 'waiting') {
       const seatedCount = COLORS.filter((c) => s.seats?.[c]).length;
       const cfg = s.config || {};
       const canCfg = s.isHost;
 
-      diceStage.append(
+      mount(waitingBox,
         h('div', { class: 'spread' },
           h('strong', {}, t('ludo.waitingHead', { n: seatedCount })),
           h('span', { class: 'chip accent' }, modeLabel(CHANNEL, s.mode, s.label))),
@@ -451,7 +556,7 @@ function mountRoom(root, ctx, code) {
       const winner = s.winner;
       const myVoted = (s.rematch || []).includes(myColor);
       const isWin = myColor && winner === myColor;
-      diceStage.append(
+      mount(finishedBox,
         h('div', { class: 'banner ' + (isWin ? 'ok' : 'accent') },
           winner === 'draw' ? t('ludo.draw') : t('ludo.winBanner', { name: nameOf(s, winner), color: colorName(winner) })),
         h('div', { class: 'row-wrap' },
@@ -473,35 +578,40 @@ function mountRoom(root, ctx, code) {
       return;
     }
 
-    // Đang chơi
+    // Đang chơi — dice3D luôn nằm cố định trong playingBox để animation 3D mượt tuyệt đối
     const turnName = nameOf(s, s.turn);
-    const rollInfo = s.dice
-      ? h('div', { class: 'ludo-dice-box' }, diceSvg(s.dice), h('span', { class: 'ludo-dice-val' }, String(s.dice)))
-      : h('div', { class: 'ludo-dice-box empty' }, '?');
+    const lr = s.lastRoll;
+    const ev = s.lastEvent;
+    let rollSummaryNode = null;
+    if (ev && ev.type === 'nomove' && lr) {
+      rollSummaryNode = h('div', { class: 'ludo-last-roll-tag warn' },
+        `🎲 ${t('ludo.rolledNoMove', { name: nameOf(s, ev.color), dice: ev.dice })}`);
+    } else if (ev && ev.type === 'triple6') {
+      rollSummaryNode = h('div', { class: 'ludo-last-roll-tag danger' },
+        `🔥 ${t('ludo.rolledTriple6', { name: nameOf(s, ev.color) })}`);
+    } else if (lr && lr.value) {
+      rollSummaryNode = h('div', { class: `ludo-last-roll-tag c-${lr.color}` },
+        `🎲 ${t('ludo.rolledResult', { name: nameOf(s, lr.color), dice: lr.value })}`);
+    }
 
-    const rollBtn = h('button', {
+    mount(playMetaSlot,
+      h('strong', { class: `ludo-turn-name c-${s.turn}` },
+        isMyTurn ? t('ludo.yourTurn') : t('ludo.playerTurn', { name: turnName, color: colorName(s.turn) })),
+      rollSummaryNode || h('span', { class: 'tiny muted' },
+        s.phase === 'roll' ? t('ludo.hintRoll') : t('ludo.hintMove')));
+
+    mount(rollBtnSlot, h('button', {
       type: 'button',
       class: 'primary ludo-roll-btn' + (isMyTurn && s.phase === 'roll' ? ' pulse' : ''),
       disabled: !(isMyTurn && s.phase === 'roll'),
-      onclick: (ev) => execRoll(ev.currentTarget),
+      onclick: (event) => execRoll(event.currentTarget),
     }, icon('dice', 18), ' ', isMyTurn && s.phase === 'roll'
       ? t('ludo.rollBtn')
-      : t('ludo.turnOf', { name: turnName }));
-
-    diceStage.append(
-      h('div', { class: 'spread' },
-        h('div', { class: 'row', style: { gap: '10px' } },
-          rollInfo,
-          h('div', { class: 'col', style: { gap: '2px' } },
-            h('strong', { class: `ludo-turn-name c-${s.turn}` },
-              isMyTurn ? t('ludo.yourTurn') : t('ludo.playerTurn', { name: turnName, color: colorName(s.turn) })),
-            h('span', { class: 'tiny muted' },
-              s.phase === 'roll' ? t('ludo.hintRoll') : t('ludo.hintMove')))),
-        clockBadge),
-      rollBtn);
+      : t('ludo.turnOf', { name: turnName })));
 
     if (isMyTurn && s.phase === 'move' && (s.legalMoves || []).length) {
-      const moveRow = h('div', { class: 'ludo-moves-bar' },
+      movesBarSlot.classList.remove('hidden');
+      mount(movesBarSlot,
         (s.legalMoves || []).map((mv) => {
           const isBack = mv.kind === 'kick_back';
           const isKick = mv.kind === 'kick' || mv.kind === 'deploy_kick';
@@ -513,7 +623,9 @@ function mountRoom(root, ctx, code) {
             onclick: () => execMove(mv),
           }, moveLabel(s, mv));
         }));
-      diceStage.appendChild(moveRow);
+    } else {
+      movesBarSlot.classList.add('hidden');
+      clear(movesBarSlot);
     }
   }
 
@@ -696,10 +808,17 @@ function mountRoom(root, ctx, code) {
       }
       const rSeq = msg.lastRoll?.seq || 0;
       const eSeq = msg.lastEvent?.seq || 0;
-      if (rSeq > prevRollSeq) {
+      if (msg.status === 'waiting') {
+        dice3D.reset();
+        prevRollSeq = 0;
+      } else if (rSeq > prevRollSeq && msg.lastRoll?.value) {
+        const animate = prevRollSeq > 0 || optimisticRollPlayed;
         prevRollSeq = rSeq;
-        if (!optimisticRollPlayed) sfx.move();
+        dice3D.landOn(msg.lastRoll.value, msg.lastRoll.color, animate);
+        if (!optimisticRollPlayed && animate) sfx.dice();
         optimisticRollPlayed = false;
+      } else if (msg.lastRoll?.value && dice3D.value !== msg.lastRoll.value) {
+        dice3D.landOn(msg.lastRoll.value, msg.lastRoll.color, false);
       }
       if (eSeq > prevEventSeq) {
         prevEventSeq = eSeq;
