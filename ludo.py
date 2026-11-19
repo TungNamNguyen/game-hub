@@ -101,6 +101,7 @@ class LudoRoom(SeatedRoom):
         self.consecutive_sixes: int = 0
         self.legal_moves: list[LudoMove] = []
         self.last_roll: dict | None = None
+        self.last_rolls: dict[str, int] = {}
         self.last_event: dict | None = None
         self.deadline: float = 0.0
         self.feed: list[dict] = []
@@ -152,6 +153,7 @@ class LudoRoom(SeatedRoom):
         self.consecutive_sixes = 0
         self.legal_moves = []
         self.last_roll = None
+        self.last_rolls = {}
         self.last_event = None
         self.deadline = 0.0
         self.feed = []
@@ -521,6 +523,7 @@ class LudoRoom(SeatedRoom):
 
         self._event_seq += 1
         self.last_roll = {"seq": self._event_seq, "color": mark, "value": val}
+        self.last_rolls[mark] = val
 
         if self.consecutive_sixes >= 3:
             self._note(f"{self._name(mark)} tung 3 lần 6 liên tiếp — mất lượt!", "warn")
@@ -693,6 +696,7 @@ class LudoRoom(SeatedRoom):
             "pieces": board_pieces,
             "legalMoves": [m.to_dict() for m in self.legal_moves] if is_my_turn else [],
             "lastRoll": self.last_roll,
+            "lastRolls": dict(self.last_rolls),
             "lastEvent": self.last_event,
             "now": time.time(),
             "deadline": self.deadline,
