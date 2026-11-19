@@ -168,6 +168,8 @@ async def lifespan(_: FastAPI):
         asyncio.create_task(hub.prune_loop()),
         # Đồng hồ phòng: Sòng Bịp và Địa Đồ đếm lùi thời gian, đẩy chuyển pha tự động.
         asyncio.create_task(hub.tick_loop()),
+        # Nhịp mô phỏng 15 Hz cho game hành động thời gian thực (Đêm Tử Thần).
+        asyncio.create_task(hub.fast_tick_loop()),
         asyncio.create_task(rt_reaper_loop()),
         asyncio.create_task(hf_sync.sync_loop(DATA_DIR, skip_json=db.is_enabled())),
         asyncio.create_task(keepalive_loop()),
