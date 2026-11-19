@@ -844,6 +844,9 @@ export const DICTS = {
     'ludo.bannerRoll': '🎲 Tới lượt bạn — hãy tung xúc xắc!',
     'ludo.bannerPick': '🐎 Bạn tung được {dice} — chọn quân để đi!',
     'ludo.bannerOther': 'Đang chờ {name} ({color})…',
+    'ludo.rolledResult': '{name} vừa tung được {dice} nút',
+    'ludo.rolledNoMove': '{name} tung được {dice} nút — không có nước đi (qua lượt)',
+    'ludo.rolledTriple6': '{name} tung 3 lần 6 liên tiếp — mất lượt!',
     'ludo.draw': 'Hòa!',
     'ludo.winBanner': '🏆 {name} ({color}) chiến thắng!',
 
@@ -1689,6 +1692,9 @@ export const DICTS = {
     'ludo.bannerRoll': '🎲 Your turn — roll the dice!',
     'ludo.bannerPick': '🐎 Rolled {dice} — choose a move!',
     'ludo.bannerOther': 'Waiting for {name} ({color})…',
+    'ludo.rolledResult': '{name} rolled {dice}',
+    'ludo.rolledNoMove': '{name} rolled {dice} — no legal moves (turn passed)',
+    'ludo.rolledTriple6': '{name} rolled three 6s in a row — turn forfeited!',
     'ludo.draw': 'Draw!',
     'ludo.winBanner': '🏆 {name} ({color}) wins!',
 
