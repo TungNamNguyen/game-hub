@@ -10,7 +10,7 @@ from ludo import START_OFFSET, TRACK_LEN
 
 class LudoBot(Bot):
     CHANNEL = "ludo"
-    THINK_DELAY = {"easy": 0.45, "normal": 0.65, "hard": 0.8}
+    THINK_DELAY = {"easy": 0.65, "normal": 0.85, "hard": 0.95}
 
     def actions(self, room, mark: str):
         if not room.in_progress() or room.turn != mark:
