@@ -40,12 +40,12 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
                 room._buy_item(sv, "medkit")
             except Exception:
                 pass
-        if sv["armor"] < sv["maxArmor"] * 0.4 and sv["money"] >= 170 and level != "easy":
+        if sv["armor"] < sv["maxArmor"] * 0.45 and sv["money"] >= 140 and level != "easy":
             try:
                 room._buy_item(sv, "shield")
             except Exception:
                 pass
-        buy_order = ("rifle", "launcher", "railgun", "flamer", "shotgun", "smg") if level == "hard" else ("rifle", "shotgun", "launcher", "smg")
+        buy_order = ("rifle", "tesla", "launcher", "railgun", "flamer", "shotgun", "smg") if level == "hard" else ("rifle", "tesla", "shotgun", "launcher", "smg")
         for wid in buy_order:
             if wid not in sv["weapons"] and sv["money"] >= WEAPONS[wid]["cost"]:
                 try:
@@ -53,6 +53,16 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
                     break
                 except Exception:
                     pass
+        if sv.get("emps", 0) == 0 and sv["money"] >= 160 and level != "easy":
+            try:
+                room._buy_item(sv, "emp")
+            except Exception:
+                pass
+        if sv.get("mines", 0) > 0:
+            try:
+                room._deploy_mine(sv)
+            except Exception:
+                pass
         # Nâng cấp vũ khí chính lên Mk.II / Mk.III nếu đủ tiền
         if level != "easy":
             cur_w = sv["weapon"]
@@ -113,6 +123,8 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
                 repel_y += (dy / d) * weight * 1.6
 
         for hz in room.hazards:
+            if hz.get("kind", "acid") != "acid":
+                continue
             dx = sv["x"] - hz["x"]
             dy = sv["y"] - hz["y"]
             d = math.hypot(dx, dy) or 1.0
