@@ -336,6 +336,7 @@ export default {
     let autoShopWave = -1;
     let currentMatchId = -1;
     let lastEventSeq = 0;
+    let lastTopbarKey = '';
     let lastLobbyKey = '';
     let lastShopKey = '';
     let lastBossKey = '';
@@ -362,6 +363,7 @@ export default {
     const slashes = [];
     const floatTexts = [];
     const shockwaves = [];
+    const fireballs = [];
     let shakePower = 0;
 
     // Local input state
@@ -385,6 +387,7 @@ export default {
       slashes.length = 0;
       floatTexts.length = 0;
       shockwaves.length = 0;
+      fireballs.length = 0;
       lerpSurv.clear();
       lerpZomb.clear();
       lerpTurret.clear();
@@ -453,53 +456,53 @@ export default {
       h('div', { class: 'z-bar armor' }, hudArmorFill));
 
     const hudWeaponIconSlot = h('span', { class: 'z-wicon-slot' });
-    const hudWeaponName = h('strong', {}, 'Súng Lục');
-    const hudAmmoTxt = h('strong', {}, '15 / ∞');
+    const hudWeaponName = h('strong', { class: 'z-weapon-name' }, 'Súng Lục');
+    const hudAmmoTxt = h('strong', { class: 'z-ammo-txt' }, '15 / ∞');
     const hudWeaponBtns = h('div', { class: 'row', style: { gap: '4px', marginTop: '5px', flexWrap: 'wrap' } });
     const weaponsBox = h('div', { class: 'z-hud-box z-weapons' },
-      h('div', { class: 'spread tiny', style: { gap: '8px' } },
-        h('div', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, hudWeaponIconSlot, hudWeaponName),
+      h('div', { class: 'z-weapon-head tiny' },
+        h('div', { class: 'row', style: { gap: '6px', alignItems: 'center', minWidth: '0', flex: '1 1 auto' } }, hudWeaponIconSlot, hudWeaponName),
         hudAmmoTxt),
       hudWeaponBtns);
 
-    const hudMoneyChip = h('span', { class: 'chip warn', style: { fontWeight: '800' } }, '💰 $180');
+    const hudMoneyChip = h('span', { class: 'chip warn', style: { fontWeight: '800', fontVariantNumeric: 'tabular-nums' } }, '💰 $180');
     const dashFillEl = h('div', { class: 'z-cd-fill', style: { width: '0%' } });
-    const dashTextEl = h('span', { class: 'z-cd-text' }, '⚡ Dash [Space]');
+    const dashTextEl = h('span', { class: 'z-cd-text' }, '⚡ Dash [Spc]');
     const dashBtnEl = h('button', {
       type: 'button',
-      class: 'z-skill-btn ready',
+      class: 'z-skill-btn z-dash-btn ready',
       onclick: () => send('dash'),
     }, dashFillEl, dashTextEl);
 
-    const grenadeTxtEl = h('span', { class: 'z-cd-text' }, '💣 ×2 [G]');
+    const grenadeTxtEl = h('span', { class: 'z-cd-text' }, '💣×2 [G]');
     const grenadeBtnEl = h('button', {
       type: 'button',
       class: 'z-skill-btn ready',
       onclick: () => throwGadget('grenade'),
     }, grenadeTxtEl);
 
-    const cryoTxtEl = h('span', { class: 'z-cd-text' }, '❄️ ×1 [F]');
+    const cryoTxtEl = h('span', { class: 'z-cd-text' }, '❄️×1 [F]');
     const cryoBtnEl = h('button', {
       type: 'button',
       class: 'z-skill-btn ready',
       onclick: () => throwGadget('cryo'),
     }, cryoTxtEl);
 
-    const empTxtEl = h('span', { class: 'z-cd-text' }, '🌩️ ×1 [Q]');
+    const empTxtEl = h('span', { class: 'z-cd-text' }, '🌩️×1 [Q]');
     const empBtnEl = h('button', {
       type: 'button',
       class: 'z-skill-btn ready',
       onclick: () => throwGadget('emp'),
     }, empTxtEl);
 
-    const mineTxtEl = h('span', { class: 'z-cd-text' }, '🚨 ×0 [C]');
+    const mineTxtEl = h('span', { class: 'z-cd-text' }, '🚨×0 [C]');
     const mineBtnEl = h('button', {
       type: 'button',
       class: 'z-skill-btn',
       onclick: () => send('mine'),
     }, mineTxtEl);
 
-    const turretTxtEl = h('span', { class: 'z-cd-text' }, '🛰️ ×0 [E]');
+    const turretTxtEl = h('span', { class: 'z-cd-text' }, '🛰️×0 [E]');
     const turretBtnEl = h('button', {
       type: 'button',
       class: 'z-skill-btn',
@@ -678,12 +681,30 @@ export default {
           }
         } else if (ev.t === 'boom' || ev.t === 'turret_boom') {
           const rad = ev.radius || 75;
-          addDecal(ev.x, ev.y, Math.min(42, rad * 0.32), '#1e293b');
-          addParticles(ev.x, ev.y, 28, '#fb923c', 80, 320, 3, 7.5, 0.22, 0.6);
-          addParticles(ev.x, ev.y, 14, '#fef08a', 40, 200, 2, 5, 0.16, 0.42);
-          shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: rad, color: '#fb923c', life: 0.35, maxLife: 0.35 });
-          shakePower = Math.max(shakePower, ev.t === 'boom' ? 11 : 6);
+          const isBarrel = ev.kind === 'barrel';
+          addDecal(ev.x, ev.y, Math.min(48, rad * 0.34), isBarrel ? '#0f172a' : '#1e293b');
+          fireballs.push({
+            x: ev.x, y: ev.y,
+            r: 14,
+            maxR: rad * (isBarrel ? 0.92 : 0.72),
+            life: isBarrel ? 0.44 : 0.32,
+            maxLife: isBarrel ? 0.44 : 0.32,
+            isBarrel,
+          });
+          addParticles(ev.x, ev.y, isBarrel ? 36 : 26, '#fb923c', 70, isBarrel ? 380 : 300, 3, isBarrel ? 8.5 : 7, 0.24, isBarrel ? 0.7 : 0.56);
+          addParticles(ev.x, ev.y, isBarrel ? 20 : 12, '#fef08a', 40, 240, 2.5, 5.5, 0.16, 0.42);
+          addParticles(ev.x, ev.y, isBarrel ? 18 : 8, '#334155', 25, 160, 5, 11, 0.38, 0.85);
+          if (isBarrel) {
+            addParticles(ev.x, ev.y, 12, '#dc2626', 110, 340, 2.5, 5.2, 0.28, 0.62);
+            shockwaves.push({ x: ev.x, y: ev.y, r: 10, maxR: rad * 0.72, color: '#fef08a', life: 0.26, maxLife: 0.26 });
+            floatTexts.push({ x: ev.x, y: ev.y - 24, text: '💥 BÙM!', color: '#fde047', big: true, life: 0.95, maxLife: 0.95 });
+          }
+          shockwaves.push({ x: ev.x, y: ev.y, r: 16, maxR: rad, color: isBarrel ? '#f97316' : '#fb923c', life: isBarrel ? 0.42 : 0.35, maxLife: isBarrel ? 0.42 : 0.35 });
+          shakePower = Math.max(shakePower, isBarrel ? 14 : ev.t === 'boom' ? 11 : 6);
           playBoomSfx();
+        } else if (ev.t === 'barrel_hit') {
+          addParticles(ev.x, ev.y, 9, '#fde047', 65, 210, 1.8, 3.8, 0.12, 0.28);
+          addParticles(ev.x, ev.y, 5, '#fb923c', 40, 140, 2, 4.2, 0.15, 0.32);
         } else if (ev.t === 'cryo') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: ev.radius || 145, color: '#38bdf8', life: 0.42, maxLife: 0.42 });
           addParticles(ev.x, ev.y, 26, '#bae6fd', 50, 210, 2.5, 6, 0.25, 0.65);
@@ -1151,10 +1172,13 @@ export default {
         const curRes = me.reserve?.[me.weapon];
         hudWeaponName.textContent = `${wInfo.name || me.weapon}${curLv > 1 ? ` Mk.${curLv}` : ''}`;
         hudWeaponName.style.color = curLv >= 3 ? '#e879f9' : (wInfo.color || '#fde047');
-        hudAmmoTxt.textContent = me.reloading
-          ? 'ĐANG THAY ĐẠN…'
-          : (buffs.infAmmo > 0 ? '♾️ / ∞' : `${curMag} / ${curRes === -1 ? '∞' : (curRes ?? 0)}`);
-        hudAmmoTxt.style.color = me.reloading ? '#fbbf24' : (buffs.infAmmo > 0 ? '#22d3ee' : '#f8fafc');
+        if (!me.reloading) {
+          hudAmmoTxt.textContent = buffs.infAmmo > 0 ? '♾️ / ∞' : `${curMag} / ${curRes === -1 ? '∞' : (curRes ?? 0)}`;
+          hudAmmoTxt.style.color = buffs.infAmmo > 0 ? '#22d3ee' : '#f8fafc';
+        } else if (!localReloadEndMs) {
+          hudAmmoTxt.textContent = '🔄 Nạp…';
+          hudAmmoTxt.style.color = '#fbbf24';
+        }
 
         const wListKey = JSON.stringify([me.weapon, me.weapons, me.weaponLv]);
         if (wListKey !== lastWeaponsListKey) {
@@ -1173,15 +1197,15 @@ export default {
         }
 
         hudMoneyChip.textContent = `💰 $${me.money}`;
-        grenadeTxtEl.textContent = `💣 ×${me.grenades} [G]`;
+        grenadeTxtEl.textContent = `💣×${me.grenades} [G]`;
         grenadeBtnEl.className = 'z-skill-btn' + (me.grenades > 0 ? ' ready' : '');
-        cryoTxtEl.textContent = `❄️ ×${me.cryos || 0} [F]`;
+        cryoTxtEl.textContent = `❄️×${me.cryos || 0} [F]`;
         cryoBtnEl.className = 'z-skill-btn' + ((me.cryos || 0) > 0 ? ' ready cryo' : '');
-        empTxtEl.textContent = `🌩️ ×${me.emps || 0} [Q]`;
+        empTxtEl.textContent = `🌩️×${me.emps || 0} [Q]`;
         empBtnEl.className = 'z-skill-btn' + ((me.emps || 0) > 0 ? ' ready emp' : '');
-        mineTxtEl.textContent = `🚨 ×${me.mines || 0} [C]`;
+        mineTxtEl.textContent = `🚨×${me.mines || 0} [C]`;
         mineBtnEl.className = 'z-skill-btn' + ((me.mines || 0) > 0 ? ' ready' : '');
-        turretTxtEl.textContent = `🛰️ ×${me.turrets} [E]`;
+        turretTxtEl.textContent = `🛰️×${me.turrets} [E]`;
         turretBtnEl.className = 'z-skill-btn' + (me.turrets > 0 ? ' ready' : '');
       } else {
         vitalsBox.classList.add('hidden');
@@ -1664,23 +1688,154 @@ export default {
       g.restore();
     }
 
+    function drawBarrel25D(g, b, tSec) {
+      const r = b.r || 16;
+      const bodyH = 15;
+      const damaged = b.hp < (b.maxHp || 35) - 0.5;
+      const hpRatio = clamp((b.hp ?? 35) / Math.max(1, b.maxHp || 35), 0, 1);
+
+      g.save();
+      g.translate(b.x, b.y);
+
+      // 1. Vòng hào quang nguy hiểm nhấp nháy khi thùng phuy bị bắn rò rỉ nhiên liệu
+      if (damaged) {
+        const pulse = 0.25 + 0.22 * Math.abs(Math.sin(tSec * 14 + b.id));
+        g.fillStyle = `rgba(251, 146, 60, ${pulse})`;
+        g.beginPath(); g.arc(0, 0, r + 9, 0, Math.PI * 2); g.fill();
+      }
+
+      // 2. Bóng đổ nghiêng 2.5D trên sàn
+      g.fillStyle = 'rgba(0,0,0,0.48)';
+      g.beginPath();
+      g.ellipse(4, bodyH * 0.55 + 4, r * 1.12, r * 0.68, 0, 0, Math.PI * 2);
+      g.fill();
+
+      // 3. Thân trụ thép hình ống 2.5D có đổ bóng kim loại (gradient trái -> sáng -> phải)
+      const cylGrad = g.createLinearGradient(-r, 0, r, 0);
+      cylGrad.addColorStop(0, '#5c1111');
+      cylGrad.addColorStop(0.28, '#dc2626');
+      cylGrad.addColorStop(0.55, '#ef4444');
+      cylGrad.addColorStop(0.85, '#991b1b');
+      cylGrad.addColorStop(1, '#450a0a');
+      g.fillStyle = cylGrad;
+      g.beginPath();
+      g.moveTo(-r, -3);
+      g.lineTo(-r, bodyH * 0.5);
+      g.ellipse(0, bodyH * 0.5, r, r * 0.52, 0, Math.PI, 0, true);
+      g.lineTo(r, -3);
+      g.closePath();
+      g.fill();
+
+      // Dải sọc cảnh báo vàng-đen công nghiệp giữa thân thùng
+      g.fillStyle = '#facc15';
+      g.fillRect(-r + 1.5, 1.5, (r - 1.5) * 2, 4.5);
+      g.fillStyle = '#18181b';
+      for (let sx = -r + 3; sx < r - 3; sx += 7) {
+        g.fillRect(sx, 1.5, 3, 4.5);
+      }
+
+      // Gân thép cường lực nổi quanh thân trụ
+      g.strokeStyle = 'rgba(255,255,255,0.22)';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.ellipse(0, 7.5, r - 0.5, r * 0.44, 0, 0.15, Math.PI - 0.15);
+      g.stroke();
+
+      // Viền thân trụ dưới
+      g.strokeStyle = 'rgba(15,23,42,0.75)';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.ellipse(0, bodyH * 0.5, r, r * 0.52, 0, 0, Math.PI);
+      g.stroke();
+
+      // 4. Nắp trên thùng phuy (vành thép nổi + lòng nắp chìm)
+      const lidY = -4;
+      g.fillStyle = '#7f1d1d';
+      g.beginPath();
+      g.ellipse(0, lidY, r, r * 0.62, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = '#fca5a5';
+      g.lineWidth = 1.8;
+      g.stroke();
+
+      const lidGrad = g.createRadialGradient(-4, lidY - 3, 2, 0, lidY, r * 0.85);
+      lidGrad.addColorStop(0, '#ef4444');
+      lidGrad.addColorStop(0.7, '#b91c1c');
+      lidGrad.addColorStop(1, '#7f1d1d');
+      g.fillStyle = lidGrad;
+      g.beginPath();
+      g.ellipse(0, lidY, r * 0.82, r * 0.5, 0, 0, Math.PI * 2);
+      g.fill();
+
+      // 2 Nắp vặn kim loại (Bung caps) trên nắp thùng
+      g.fillStyle = '#cbd5e1';
+      g.strokeStyle = '#334155';
+      g.lineWidth = 1;
+      g.beginPath(); g.arc(-r * 0.42, lidY - 1.5, 2.7, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.beginPath(); g.arc(r * 0.42, lidY + 1.5, 1.9, 0, Math.PI * 2); g.fill(); g.stroke();
+
+      // Biểu tượng hình thoi cảnh báo cháy nổ sắc nét (Vector Canvas, không dùng emoji mờ)
+      g.save();
+      g.translate(0, lidY);
+      g.fillStyle = '#facc15';
+      g.strokeStyle = '#18181b';
+      g.lineWidth = 1.1;
+      g.beginPath();
+      g.moveTo(0, -5.5);
+      g.lineTo(5.5, 0);
+      g.lineTo(0, 5.5);
+      g.lineTo(-5.5, 0);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      // Ngọn lửa nhỏ đen/đỏ ở tâm hình thoi
+      g.fillStyle = '#b91c1c';
+      g.beginPath();
+      g.moveTo(0, -3.2);
+      g.quadraticCurveTo(2.4, -0.4, 0, 2.8);
+      g.quadraticCurveTo(-2.4, -0.4, 0, -3.2);
+      g.fill();
+      g.restore();
+
+      // Tia lửa xì ra + thanh HP nhỏ khi thùng đã bị trúng đạn
+      if (damaged) {
+        const sparkR = 2.5 + 1.5 * Math.sin(tSec * 24 + b.id);
+        g.fillStyle = '#fef08a';
+        g.beginPath(); g.arc(-r * 0.3, lidY - 4, sparkR, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(0,0,0,0.75)';
+        g.fillRect(-16, lidY - 16, 32, 4);
+        g.fillStyle = hpRatio > 0.4 ? '#fb923c' : '#ef4444';
+        g.fillRect(-16, lidY - 16, 32 * hpRatio, 4);
+      }
+
+      g.restore();
+    }
+
     function renderFrame(nowMs) {
       rafId = requestAnimationFrame(renderFrame);
       const dt = Math.min(0.05, Math.max(0.001, (nowMs - lastFrameAt) / 1000));
       lastFrameAt = nowMs;
       if (!state || state.status !== 'playing') return;
 
-      // 1. Cập nhật thanh hồi chiêu Dash 60 FPS trực tiếp
+      // 1. Cập nhật thanh hồi chiêu Dash & đếm ngược Thay đạn 60 FPS trực tiếp (không đổi kích thước HUD!)
       if (localDashEndMs > nowMs) {
         const rem = (localDashEndMs - nowMs) / 1000;
         const pct = Math.min(100, (rem / Math.max(0.5, localDashTotal)) * 100);
         dashFillEl.style.width = `${pct.toFixed(1)}%`;
         dashTextEl.textContent = `⚡ ${rem.toFixed(1)}s`;
-        dashBtnEl.className = 'z-skill-btn cooling';
+        dashBtnEl.className = 'z-skill-btn z-dash-btn cooling';
       } else if (dashFillEl.style.width !== '0%') {
         dashFillEl.style.width = '0%';
-        dashTextEl.textContent = '⚡ Dash [Space]';
-        dashBtnEl.className = 'z-skill-btn ready';
+        dashTextEl.textContent = '⚡ Dash [Spc]';
+        dashBtnEl.className = 'z-skill-btn z-dash-btn ready';
+      }
+      if (localReloadEndMs > nowMs) {
+        const remRel = Math.max(0.1, (localReloadEndMs - nowMs) / 1000);
+        const relTxt = `🔄 ${remRel.toFixed(1)}s`;
+        if (hudAmmoTxt.textContent !== relTxt) {
+          hudAmmoTxt.textContent = relTxt;
+          hudAmmoTxt.style.color = '#fbbf24';
+        }
       }
 
       // 2. Cập nhật Viền Máu Cảnh Báo (Blood Vignette Overlay) 60 FPS
@@ -1820,24 +1975,8 @@ export default {
       const obs = state.arena?.obstacles || [];
       for (const ob of obs) drawObstacle25D(g2d, ob, state.mode, tSec);
 
-      // Thùng Phuy Nhiên Liệu Đỏ (Explosive Barrels)
-      for (const b of (state.barrels || [])) {
-        g2d.save();
-        g2d.translate(b.x, b.y);
-        g2d.fillStyle = 'rgba(0,0,0,0.45)';
-        g2d.beginPath(); g2d.ellipse(3, 5, b.r, b.r * 0.8, 0, 0, Math.PI * 2); g2d.fill();
-        g2d.fillStyle = '#dc2626';
-        g2d.beginPath(); g2d.arc(0, 0, b.r, 0, Math.PI * 2); g2d.fill();
-        g2d.strokeStyle = '#fbbf24';
-        g2d.lineWidth = 2.4;
-        g2d.stroke();
-        g2d.fillStyle = '#fef08a';
-        g2d.font = '800 11px system-ui, sans-serif';
-        g2d.textAlign = 'center';
-        g2d.textBaseline = 'middle';
-        g2d.fillText('🔥', 0, 1);
-        g2d.restore();
-      }
+      // Thùng Phuy Nhiên Liệu Đỏ 2.5D (Explosive Barrels)
+      for (const b of (state.barrels || [])) drawBarrel25D(g2d, b, tSec);
 
       // Trụ súng Sentry tự động (có thanh HP + thanh Đạn!)
       const activeTurrets = new Set();
@@ -2038,6 +2177,27 @@ export default {
         g2d.restore();
       }
 
+      // Quả cầu lửa nổ (Fireball Glow — Thùng phuy, Lựu đạn, Rocket M79)
+      for (let i = fireballs.length - 1; i >= 0; i--) {
+        const fb = fireballs[i];
+        fb.life -= dt;
+        if (fb.life <= 0) { fireballs.splice(i, 1); continue; }
+        const prog = 1 - fb.life / fb.maxLife;
+        const rad = fb.r + (fb.maxR - fb.r) * Math.pow(prog, 0.52);
+        const alpha = Math.max(0, 1 - Math.pow(prog, 1.35));
+        g2d.save();
+        g2d.globalAlpha = alpha;
+        const grad = g2d.createRadialGradient(fb.x, fb.y, rad * 0.08, fb.x, fb.y, rad);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.28, '#fef08a');
+        grad.addColorStop(0.62, 'rgba(249, 115, 22, 0.85)');
+        grad.addColorStop(0.86, 'rgba(220, 38, 38, 0.42)');
+        grad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        g2d.fillStyle = grad;
+        g2d.beginPath(); g2d.arc(fb.x, fb.y, rad, 0, Math.PI * 2); g2d.fill();
+        g2d.restore();
+      }
+
       // Sóng xung kích (Shockwaves) & Hạt nổ (Particles)
       for (let i = shockwaves.length - 1; i >= 0; i--) {
         const sw = shockwaves[i];
@@ -2216,7 +2376,11 @@ export default {
     /* ------------------------------------------- State Sync -------------- */
     function renderState() {
       if (!state) return;
-      ctx.setTopbar(...roomTopbar(ctx, state, CHANNEL, t('zombie.title')));
+      const tbKey = `${state.code || ''}|${t('zombie.title')}`;
+      if (tbKey !== lastTopbarKey) {
+        lastTopbarKey = tbKey;
+        ctx.setTopbar(...roomTopbar(ctx, state, CHANNEL, t('zombie.title')));
+      }
 
       if (typeof state.matchId === 'number' && state.matchId !== currentMatchId) {
         currentMatchId = state.matchId;
