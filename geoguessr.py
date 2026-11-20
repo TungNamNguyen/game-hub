@@ -282,6 +282,8 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         (20.62, 21.02, -156.68, -156.00),   # Hawaii (Polynesia) — Đảo Maui
         (19.40, 20.15, -156.05, -154.90),   # Hawaii (Polynesia) — Đảo Lớn (Big Island)
         (21.88, 22.23, -159.75, -159.30),   # Hawaii (Polynesia) — Đảo Kauai
+        (21.08, 21.19, -157.25, -156.82),   # Hawaii (Polynesia) — Đảo Molokai
+        (20.76, 20.89, -156.98, -156.86),   # Hawaii (Polynesia) — Đảo Lanai
         (-16.28, -16.22, 168.10, 168.17),   # Vanuatu — Đảo núi lửa Ambrym
         (-25.08, -25.05, -130.12, -130.08), # Quần đảo Pitcairn — Adamstown
         (28.19, 28.22, -177.39, -177.36),   # Midway Atoll — Sand Island
@@ -289,7 +291,8 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         (-12.20, -12.11, 96.81, 96.91),     # Quần đảo Cocos (Keeling)
         (-36.06, -35.56, 136.53, 138.13),   # Đảo Kangaroo (Nam Úc)
         (-32.02, -31.99, 115.45, 115.56),   # Đảo Rottnest (Tây Úc)
-        (-19.18, -19.10, 146.79, 146.88),   # Đảo Magnetic (Queensland)
+        (-27.09, -26.97, 153.12, 153.21),   # Đảo Bribie (Queensland — Gen 4)
+        (-20.30, -20.23, 148.66, 148.80),   # Quần đảo Whitsundays / Airlie Beach (Queensland — Gen 4)
         (-38.53, -38.44, 145.10, 145.36),   # Đảo Phillip (Victoria)
         (-43.49, -43.05, 147.17, 147.43),   # Đảo Bruny (Tasmania)
         (-40.15, -39.58, 143.82, 144.15),   # Đảo King (Tasmania)
@@ -302,18 +305,19 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
 # Siêu dữ liệu (mã quốc gia mặc định, bán kính quét m, trọng số chọn khung) cho Châu Đại Dương:
 # Tổng trọng số = 100.0 -> Úc (38.0%) + New Zealand (22.0%) = 60.0%; Quốc đảo & Lãnh thổ = 40.0%.
 STREETVIEW_BOX_META: dict[tuple[float, float, float, float], tuple[str, int, float]] = {
-    # Úc đất liền + 7 đảo ven bờ = 38.0%
-    (-38.5, -24.0, 140.5, 153.5): ("AU", 45000, 11.0),
-    (-24.0, -15.5, 144.5, 152.5): ("AU", 45000, 4.5),
+    # Úc đất liền + 8 đảo/bờ biển ven bờ = 38.0%
+    (-38.5, -24.0, 140.5, 153.5): ("AU", 45000, 10.6),
+    (-24.0, -15.5, 144.5, 152.5): ("AU", 45000, 4.4),
     (-43.5, -40.8, 144.8, 148.2): ("AU", 40000, 4.0),
-    (-35.5, -26.0, 134.0, 140.5): ("AU", 45000, 4.5),
+    (-35.5, -26.0, 134.0, 140.5): ("AU", 45000, 4.4),
     (-35.0, -18.0, 114.5, 124.0): ("AU", 45000, 5.5),
     (-25.0, -12.0, 129.5, 138.0): ("AU", 45000, 3.5),
     (-36.06, -35.56, 136.53, 138.13): ("AU", 15000, 1.0),
     (-32.02, -31.99, 115.45, 115.56): ("AU", 6000, 0.9),
-    (-19.18, -19.10, 146.79, 146.88): ("AU", 8000, 0.7),
+    (-27.09, -26.97, 153.12, 153.21): ("AU", 8000, 0.7),
+    (-20.30, -20.23, 148.66, 148.80): ("AU", 8000, 0.7),
     (-38.53, -38.44, 145.10, 145.36): ("AU", 10000, 0.7),
-    (-43.49, -43.05, 147.17, 147.43): ("AU", 12000, 0.7),
+    (-43.49, -43.05, 147.17, 147.43): ("AU", 12000, 0.6),
     (-40.15, -39.58, 143.82, 144.15): ("AU", 15000, 0.5),
     (-40.25, -39.72, 147.80, 148.35): ("AU", 15000, 0.5),
     # New Zealand 2 đảo chính + 2 đảo ven bờ = 22.0%
@@ -322,22 +326,24 @@ STREETVIEW_BOX_META: dict[tuple[float, float, float, float], tuple[str, int, flo
     (-36.84, -36.75, 174.98, 175.18): ("NZ", 8000, 1.0),
     (-46.96, -46.84, 168.05, 168.20): ("NZ", 10000, 1.0),
     # Quốc đảo & Lãnh thổ Thái Bình Dương / Ấn Độ Dương = 40.0%
-    (13.26, 13.58, 144.65, 144.92): ("GU", 9000, 5.5),
-    (15.10, 15.29, 145.69, 145.82): ("MP", 9000, 3.5),
+    (13.26, 13.58, 144.65, 144.92): ("GU", 9000, 5.0),
+    (15.10, 15.29, 145.69, 145.82): ("MP", 9000, 3.0),
     (14.94, 15.08, 145.58, 145.66): ("MP", 8000, 1.5),
     (14.12, 14.20, 145.13, 145.28): ("MP", 8000, 1.5),
-    (-14.37, -14.25, -170.84, -170.56): ("AS", 9000, 4.5),
+    (-14.37, -14.25, -170.84, -170.56): ("AS", 9000, 4.0),
     (-14.19, -14.15, -169.69, -169.60): ("AS", 8000, 1.5),
     (-14.25, -14.20, -169.52, -169.42): ("AS", 8000, 1.5),
-    (21.25, 21.70, -158.25, -157.65): ("HI", 10000, 2.5),
-    (20.62, 21.02, -156.68, -156.00): ("HI", 12000, 2.0),
-    (19.40, 20.15, -156.05, -154.90): ("HI", 15000, 2.0),
-    (21.88, 22.23, -159.75, -159.30): ("HI", 10000, 1.5),
-    (-16.28, -16.22, 168.10, 168.17): ("VU", 10000, 3.0),
-    (-25.08, -25.05, -130.12, -130.08): ("PN", 8000, 2.5),
-    (28.19, 28.22, -177.39, -177.36): ("UM", 6000, 2.0),
-    (-10.50, -10.41, 105.56, 105.71): ("CX", 8000, 2.5),
-    (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 2.5),
+    (21.25, 21.70, -158.25, -157.65): ("HI", 10000, 2.0),
+    (20.62, 21.02, -156.68, -156.00): ("HI", 12000, 1.8),
+    (19.40, 20.15, -156.05, -154.90): ("HI", 15000, 1.7),
+    (21.88, 22.23, -159.75, -159.30): ("HI", 10000, 1.3),
+    (21.08, 21.19, -157.25, -156.82): ("HI", 10000, 1.1),
+    (20.76, 20.89, -156.98, -156.86): ("HI", 10000, 1.1),
+    (-16.28, -16.22, 168.10, 168.17): ("VU", 10000, 3.2),
+    (-25.08, -25.05, -130.12, -130.08): ("PN", 8000, 2.8),
+    (28.19, 28.22, -177.39, -177.36): ("UM", 6000, 2.2),
+    (-10.50, -10.41, 105.56, 105.71): ("CX", 8000, 2.4),
+    (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 2.4),
 }
 _MICRO_ISLAND_CCS = frozenset({"GU", "MP", "AS", "HI", "VU", "PN", "UM", "CX", "CC"})
 STREETVIEW_LAND_BOXES["world"] = [
@@ -429,6 +435,8 @@ GEO_GAZETTEER: tuple[tuple[str, str, str, float, float, float], ...] = (
     ("Kailua-Kona", "Đảo Lớn (Big Island)", "Hawaii", 19.6400, -155.9969, 45.0),
     ("Thành phố Hilo", "Đảo Lớn (Big Island)", "Hawaii", 19.7241, -155.0868, 45.0),
     ("Lihue / Kapaʻa / Waimea", "Đảo Kauai", "Hawaii", 22.0500, -159.5000, 35.0),
+    ("Kaunakakai / Maunaloa", "Đảo Molokai", "Hawaii", 21.1330, -157.0220, 28.0),
+    ("Lānaʻi City", "Đảo Lanai", "Hawaii", 20.8280, -156.9200, 18.0),
     # Vanuatu, Pitcairn, Midway, Christmas, Cocos
     ("Vành núi lửa Ambrym (Tỉnh Malampa)", "Đảo Ambrym", "Vanuatu", -16.2500, 168.1350, 25.0),
     ("Thủ phủ Adamstown & Vịnh Bounty", "Đảo Pitcairn", "Quần đảo Pitcairn", -25.0667, -130.1000, 15.0),
@@ -438,7 +446,8 @@ GEO_GAZETTEER: tuple[tuple[str, str, str, float, float, float], ...] = (
     # Australian & NZ Offshore Islands
     ("Kingscote / Vivonne Bay", "Đảo Kangaroo (Nam Úc)", "Úc", -35.7800, 137.2100, 65.0),
     ("Thomson Bay / Wadjemup", "Đảo Rottnest (Tây Úc)", "Úc", -32.0051, 115.5118, 12.0),
-    ("Nelly Bay / Horseshoe Bay", "Đảo Magnetic (Queensland)", "Úc", -19.1400, 146.8400, 12.0),
+    ("Woorim / Bongaree", "Đảo Bribie (Queensland)", "Úc", -27.0570, 153.1750, 14.0),
+    ("Airlie Beach / Shute Harbour", "Quần đảo Whitsundays (Queensland)", "Úc", -20.2670, 148.7170, 18.0),
     ("Cowes / Ventnor", "Đảo Phillip (Victoria)", "Úc", -38.4820, 145.2335, 18.0),
     ("South Bruny / The Neck", "Đảo Bruny (Tasmania)", "Úc", -43.3200, 147.2900, 32.0),
     ("Currie / Pearshape", "Đảo King (Tasmania)", "Úc", -39.8800, 143.9500, 40.0),
@@ -934,6 +943,30 @@ def _pick_land_box(
     return box, "", default_radius
 
 
+def _is_valid_sv_resolution(node: list) -> bool:
+    """Chặn ảnh Street View Gen 1 (2007-2008, [1664, 3328], chỉ có 4 tầng zoom 0..3).
+
+    Trên màn hình lớn, Google Maps Embed API yêu cầu tile zoom=4 và máy chủ trả về
+    HTTP 200 kèm ảnh JPEG 512x512 màu đen đặc RGB(0,0,0), gây lỗi màn hình đen.
+    """
+    if not isinstance(node, list) or len(node) < 3 or not isinstance(node[2], list):
+        return False
+    dims = node[2][2] if len(node[2]) > 2 and isinstance(node[2][2], list) else []
+    if len(dims) < 2:
+        return False
+    try:
+        h_px, w_px = int(dims[0]), int(dims[1])
+    except (TypeError, ValueError):
+        return False
+    if h_px < 3328 or w_px < 6656:
+        return False
+    # Kiểm tra thêm số tầng zoom nếu có trường pyramid levels
+    if len(node[2]) > 3 and isinstance(node[2][3], list) and node[2][3] and isinstance(node[2][3][0], list):
+        if len(node[2][3][0]) < 5:
+            return False
+    return True
+
+
 def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout: float = 1.5) -> dict | None:
     """Truy vấn Google MapsJsInternalService/SingleImageSearch để lấy 100% ảnh Street View thật toàn cầu."""
     if is_sv_circuit_open():
@@ -965,6 +998,9 @@ def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout
         node = data[1]
         # Chỉ nhận Panorama 360° chuẩn (type == 2), loại bỏ hoàn toàn ảnh 2D [10, 3]
         if not (isinstance(node[1], list) and node[1] and node[1][0] == 2):
+            return None
+        # Chặn tuyệt đối ảnh Gen 1 độ phân giải thấp [1664, 3328] dễ bị màn hình đen ở zoom=4
+        if not _is_valid_sv_resolution(node):
             return None
         loc_block = node[5][0][1]
         # Nếu loc_block[3] != None tức là ảnh bên trong tòa nhà / tầng lầu -> loại bỏ
