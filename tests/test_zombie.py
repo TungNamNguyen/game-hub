@@ -353,16 +353,27 @@ def test_zombie_cc_gadgets_turret_hp_barrels_and_maps():
     assert len(room.mines) == 0
     assert z4["hp"] <= 0
 
-    # 7. Bắn nổ Thùng Phuy Nhiên Liệu
-    assert len(room.barrels) >= 1
-    b = room.barrels[0]
-    b["x"], b["y"] = sv["x"] + 120.0, sv["y"]
+    # 7. Bắn nổ Thùng Phuy Nhiên Liệu -> phải phát sự kiện 'barrel_hit', 'boom' (kind='barrel'), gây AoE và kích nổ dây chuyền!
+    assert len(room.barrels) >= 2
+    b1 = room.barrels[0]
+    b2 = room.barrels[1]
+    b1["x"], b1["y"] = sv["x"] + 120.0, sv["y"]
+    b2["x"], b2["y"] = b1["x"] + 90.0, b1["y"] + 40.0
+    z5 = room._spawn_one_zombie("walker")
+    z5["x"], z5["y"] = b1["x"] + 50.0, b1["y"] - 30.0
+    room.events.clear()
     room.handle("u1", "switch", {"weapon": "pistol"})
     sv["fireCd"] = 0.0
     room.handle("u1", "shoot", {"aim": 0.0})
+    assert b1["hp"] > 0
+    assert any(e["t"] == "barrel_hit" for e in room.events), "Non-lethal hit on barrel must emit barrel_hit"
     sv["fireCd"] = 0.0
     room.handle("u1", "shoot", {"aim": 0.0})
-    assert b["hp"] <= 0
+    assert b1["hp"] <= 0 and b1.get("detonated") is True
+    assert b2["hp"] <= 0 and b2.get("detonated") is True, "Adjacent barrel must chain-detonate"
+    barrel_booms = [e for e in room.events if e["t"] == "boom" and e.get("kind") == "barrel"]
+    assert len(barrel_booms) >= 2, "Shooting barrel must emit boom(kind='barrel') for VFX!"
+    assert z5["hp"] <= 0, "Barrel explosion must damage/kill nearby zombies"
 
 
 def test_zombie_miniboss_and_titan_telegraph_skills():
