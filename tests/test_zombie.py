@@ -49,10 +49,13 @@ def test_zombie_combat_weapons_and_special_infected():
     room.wave_remaining_to_spawn = ["walker"]
     room.spawn_timer = 99.0
 
-    # Mua và kiểm tra tất cả các loại vũ khí (smg, shotgun, rifle, flamer, railgun)
-    for wid in ("smg", "shotgun", "rifle", "flamer", "railgun"):
+    # Chỉ cho phép mua đồ khi đang ở pha shop (giữa các đợt)
+    room.phase = "shop"
+    room.shop_deadline = time.time() + 16.0
+    for wid in ("smg", "shotgun", "rifle", "flamer", "tesla", "railgun"):
         room.handle("u1", "buy", {"item": wid})
         assert wid in sv["weapons"]
+    room.phase = "wave"
 
     # Thử bắn Railgun xuyên hàng dọc 2 zombie
     z1 = room._spawn_one_zombie("walker")
@@ -220,6 +223,7 @@ def test_zombie_six_players_and_rematch_monotonic_events():
 
 
 def test_zombie_shop_upgrades_launcher_and_items():
+    from games import GameError
     room = ZombieRoom("ZSHP", "lab")
     room.join("u1", "Gunsmith", "#38bdf8")
     room.handle("u1", "start", {})
@@ -230,6 +234,21 @@ def test_zombie_shop_upgrades_launcher_and_items():
     room.wave_remaining_to_spawn = ["walker"]
     room.spawn_timer = 99.0
 
+    # Không được phép mua đồ khi đang đánh wave!
+    try:
+        room.handle("u1", "buy", {"item": "launcher"})
+        assert False, "Expected GameError when buying during wave"
+    except GameError:
+        pass
+
+    # Chuyển sang pha chờ (shop): vừa mua đồ vừa DI CHUYỂN tự do được!
+    room.phase = "shop"
+    room.shop_deadline = time.time() + 16.0
+    old_x = sv["x"]
+    room.handle("u1", "input", {"vx": 1.0, "vy": 0.0, "aim": 0.0, "firing": False})
+    room.tick(dt_override=0.066)
+    assert sv["x"] > old_x, "Survivor must be able to move during shop intermission!"
+
     # Mua Phóng Lựu M79 & nâng cấp lên Mk.II -> Mk.III
     room.handle("u1", "buy", {"item": "launcher"})
     assert "launcher" in sv["weapons"]
@@ -239,24 +258,111 @@ def test_zombie_shop_upgrades_launcher_and_items():
     room.handle("u1", "buy", {"item": "upgrade:launcher"})
     assert sv["weaponLv"]["launcher"] == 3
 
-    # Bắn tên lửa M79 tiêu diệt mục tiêu gần đó bằng sát thương nổ lan
-    z = room._spawn_one_zombie("walker")
-    z["x"], z["y"] = 640.0, 450.0
-    room.handle("u1", "shoot", {"aim": 0.0})
-    for _ in range(10):
-        room.tick(dt_override=0.06)
-    assert z["hp"] <= 0
-
-    # Mua Shield & Stim (reset Dash cooldown)
+    # Mua Shield (chỉ hồi đầy đúng maxArmor, KHÔNG còn Over-Shield!) & Stim
+    sv["armor"] = 10.0
     sv["dashCd"] = time.time() + 3.0
     sv["reloadUntil"] = time.time() + 2.0
     room.handle("u1", "buy", {"item": "shield"})
-    assert sv["armor"] > sv["maxArmor"]
+    assert sv["armor"] == sv["maxArmor"]
     room.handle("u1", "buy", {"item": "stim"})
     assert sv["dashCd"] == 0.0
     assert sv["stimUntil"] > time.time()
     room.handle("u1", "buy", {"item": "ammo"})
     assert sv["reloadUntil"] == 0.0
+
+    # Sang lại wave để bắn tên lửa M79 tiêu diệt mục tiêu gần đó bằng sát thương nổ lan
+    room.phase = "wave"
+    z = room._spawn_one_zombie("walker")
+    z["x"], z["y"] = sv["x"] + 130.0, sv["y"]
+    room.handle("u1", "shoot", {"aim": 0.0})
+    for _ in range(10):
+        room.tick(dt_override=0.06)
+    assert z["hp"] <= 0
+
+
+def test_zombie_cc_gadgets_turret_hp_barrels_and_maps():
+    # Kiểm tra cả 6 bản đồ mới đều khởi tạo sạch sẽ
+    for map_id in ("outpost", "lab", "metro", "dock", "reactor", "endless"):
+        r = ZombieRoom("ZMAP", map_id)
+        r.join("u1", "Scout", "#38bdf8")
+        r.handle("u1", "start", {})
+        assert len(r._obstacles()) >= 5
+        assert len(r.barrels) == 4
+
+    room = ZombieRoom("ZCC1", "metro")
+    room.join("u1", "Tactician", "#38bdf8")
+    room.handle("u1", "class", {"cls": "engineer"})
+    room.handle("u1", "start", {})
+    sv = room.survivors["1"]
+    sv["money"] = 4000
+    sv["x"], sv["y"] = 500.0, 340.0
+    room.zombies.clear()
+    room.wave_remaining_to_spawn = ["walker"]
+    room.spawn_timer = 99.0
+
+    # Mua Tesla, Cryo, EMP, Mine trong pha shop
+    room.phase = "shop"
+    room.shop_deadline = time.time() + 16.0
+    for it in ("tesla", "cryo", "emp", "mine"):
+        room.handle("u1", "buy", {"item": it})
+    room.phase = "wave"
+
+    # 1. Bắn Tesla giật chuyền qua 2 zombie và làm chậm/choáng
+    z1 = room._spawn_one_zombie("brute")
+    z2 = room._spawn_one_zombie("brute")
+    z1["x"], z1["y"] = 640.0, 340.0
+    z2["x"], z2["y"] = 720.0, 340.0
+    room.handle("u1", "switch", {"weapon": "tesla"})
+    room.handle("u1", "shoot", {"aim": 0.0})
+    assert z1["slowTimer"] > 0 and z2["slowTimer"] > 0
+    assert any(e["t"] == "chain" for e in room.events)
+
+    # 2. Ném Lựu Đạn EMP -> làm choáng Stun 2.8s
+    room.handle("u1", "emp", {"tx": 680.0, "ty": 340.0})
+    for _ in range(12):
+        room.tick(dt_override=0.06)
+    assert z1["stunTimer"] > 1.5
+
+    # 3. Ném Lựu Đạn Băng Cryo -> tạo vùng Cryo Hazard trên sàn
+    room.handle("u1", "cryo", {"tx": 680.0, "ty": 340.0})
+    for _ in range(12):
+        room.tick(dt_override=0.06)
+    assert any(h.get("kind") == "cryo" for h in room.hazards)
+
+    # 4. Trụ súng Sentry có HP & bị Zombie đập mất máu
+    room.handle("u1", "turret", {})
+    tr = room.turrets[0]
+    assert tr["hp"] > 0 and tr["hp"] == tr["maxHp"]
+    z3 = room._spawn_one_zombie("walker")
+    z3["x"], z3["y"] = tr["x"] + 15.0, tr["y"]
+    z3["stunTimer"] = 0.0
+    tr["fireCd"] = time.time() + 10.0  # để zombie kịp đánh trụ
+    room.tick(dt_override=0.066)
+    assert tr["hp"] < tr["maxHp"]
+
+    # 5. Khi Zombie đánh trúng người chơi -> phát sự kiện 'hurt' để hiện vết cào & viền máu
+    room._damage_survivor(sv, 20.0, time.time(), sx=520.0, sy=450.0, kind="melee")
+    assert any(e["t"] == "hurt" and e["mark"] == "1" for e in room.events)
+
+    # 6. Đặt Mìn Từ Trường & kích nổ khi Zombie bước vào
+    room.handle("u1", "mine", {})
+    assert len(room.mines) == 1
+    z4 = room._spawn_one_zombie("walker")
+    z4["x"], z4["y"] = room.mines[0]["x"] + 10.0, room.mines[0]["y"]
+    room.tick(dt_override=0.066)
+    assert len(room.mines) == 0
+    assert z4["hp"] <= 0
+
+    # 7. Bắn nổ Thùng Phuy Nhiên Liệu
+    assert len(room.barrels) >= 1
+    b = room.barrels[0]
+    b["x"], b["y"] = sv["x"] + 120.0, sv["y"]
+    room.handle("u1", "switch", {"weapon": "pistol"})
+    sv["fireCd"] = 0.0
+    room.handle("u1", "shoot", {"aim": 0.0})
+    sv["fireCd"] = 0.0
+    room.handle("u1", "shoot", {"aim": 0.0})
+    assert b["hp"] <= 0
 
 
 def test_zombie_miniboss_and_titan_telegraph_skills():
