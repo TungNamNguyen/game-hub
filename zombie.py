@@ -18,7 +18,7 @@ from games import GameError, Player, SeatedRoom, bot_uid
 ARENA_W = 1400.0
 ARENA_H = 900.0
 PLAYER_RADIUS = 17.0
-SHOP_SECONDS = 12.0
+SHOP_SECONDS = 16.0
 BLEEDOUT_SECONDS = 15.0
 REVIVE_SECONDS = 2.5
 REVIVE_RADIUS = 72.0
@@ -190,7 +190,26 @@ WEAPONS: dict[str, dict] = {
         "knockback": 12.0,
         "burn": 12.0,
         "splash": 0.0,
+        "chain": 0,
         "color": "#f97316",
+    },
+    "tesla": {
+        "name": "Hồ Quang Tesla",
+        "cost": 760,
+        "dmg": 54.0,
+        "rate": 0.36,
+        "mag": 16,
+        "reserve": 96,
+        "reload": 1.75,
+        "pellets": 1,
+        "spread": 0.02,
+        "range": 460.0,
+        "pierce": 1,
+        "knockback": 22.0,
+        "burn": 0.0,
+        "splash": 0.0,
+        "chain": 4,
+        "color": "#60a5fa",
     },
     "railgun": {
         "name": "Súng Điện Từ Railgun",
@@ -207,11 +226,12 @@ WEAPONS: dict[str, dict] = {
         "knockback": 115.0,
         "burn": 0.0,
         "splash": 0.0,
+        "chain": 0,
         "color": "#22d3ee",
     },
 }
 
-WEAPON_ORDER = ("pistol", "smg", "shotgun", "rifle", "launcher", "flamer", "railgun")
+WEAPON_ORDER = ("pistol", "smg", "shotgun", "rifle", "launcher", "flamer", "tesla", "railgun")
 
 PERKS: dict[str, dict] = {
     "damage": {"name": "Đạn Xuyên Phá", "cost": 200, "max": 3},
@@ -222,12 +242,16 @@ PERKS: dict[str, dict] = {
 }
 
 SHOP_ITEMS: dict[str, dict] = {
-    "medkit": {"name": "Túi Máu & Giáp", "cost": 120, "desc": "+65 HP · +30 Giáp"},
-    "ammo": {"name": "Tiếp Đạn Toàn Bộ", "cost": 100, "desc": "Nạp đầy mọi súng"},
-    "grenade": {"name": "Lựu Đạn Nổ (+2)", "cost": 140, "desc": "Tối đa 5 quả"},
-    "turret": {"name": "Trụ Súng Sentry (+1)", "cost": 280, "desc": "Tối đa 3 trụ"},
-    "shield": {"name": "Giáp Cường Hóa", "cost": 170, "desc": "Đầy 100% Giáp +25 Over-Shield"},
-    "stim": {"name": "Huyết Thanh Cuồng Phong", "cost": 160, "desc": "+40 HP · Reset Dash · +25% Tốc độ 20s"},
+    "medkit": {"name": "Túi Máu & Giáp", "cost": 120, "desc": "+65 HP · +30 Giáp", "cat": "supply"},
+    "shield": {"name": "Nạp Đầy Giáp", "cost": 140, "desc": "Hồi đầy 100% thanh Giáp (Shield)", "cat": "supply"},
+    "ammo": {"name": "Tiếp Đạn Toàn Bộ", "cost": 100, "desc": "Nạp đầy đạn mọi súng", "cat": "supply"},
+    "stim": {"name": "Huyết Thanh Cuồng Phong", "cost": 160, "desc": "+40 HP · Reset Dash · +25% Tốc độ 20s", "cat": "supply"},
+    "grenade": {"name": "Lựu Đạn Nổ (+2)", "cost": 140, "desc": "Phím [G] · Nổ diện rộng (tối đa 5)", "cat": "gadget"},
+    "cryo": {"name": "Lựu Đạn Băng (+2)", "cost": 150, "desc": "Phím [F] · Đóng băng chậm 65% trong 5.5s", "cat": "gadget"},
+    "emp": {"name": "Lựu Đạn EMP (+2)", "cost": 160, "desc": "Phím [Q] · Làm choáng Stun 2.8s ngắt chiêu", "cat": "gadget"},
+    "mine": {"name": "Mìn Từ Trường (+2)", "cost": 170, "desc": "Phím [C] · Đặt mìn nổ 220 DMG + Choáng 1.5s", "cat": "gadget"},
+    "turret": {"name": "Trụ Súng Sentry (+1)", "cost": 280, "desc": "Phím [E] · Có thanh HP & đạn (tối đa 3)", "cat": "gadget"},
+    "repair": {"name": "Sửa & Nạp Trụ Súng", "cost": 150, "desc": "Hồi 100% HP & đạn cho toàn bộ Trụ của bạn", "cat": "gadget"},
 }
 
 ZOMBIE_SPECS: dict[str, dict] = {
@@ -256,7 +280,7 @@ ZOMBIE_SPECS: dict[str, dict] = {
 
 BOSS_KINDS = ("butcher", "queen", "boss", "titan")
 
-# Các chướng ngại vật hình chữ nhật (x, y, w, h, kind) tạo chiến thuật vòng vây cho 3 bản đồ
+# Các chướng ngại vật hình chữ nhật (x, y, w, h, kind) tạo chiến thuật vòng vây cho 6 bản đồ
 MAP_OBSTACLES: dict[str, list[dict]] = {
     "outpost": [
         {"x": 260, "y": 210, "w": 150, "h": 54, "kind": "barricade"},
@@ -274,6 +298,33 @@ MAP_OBSTACLES: dict[str, list[dict]] = {
         {"x": 988, "y": 550, "w": 72, "h": 180, "kind": "biotank"},
         {"x": 610, "y": 240, "w": 180, "h": 46, "kind": "console"},
         {"x": 610, "y": 614, "w": 180, "h": 46, "kind": "console"},
+    ],
+    "metro": [
+        {"x": 200, "y": 175, "w": 260, "h": 76, "kind": "train_car"},
+        {"x": 940, "y": 175, "w": 260, "h": 76, "kind": "train_car"},
+        {"x": 200, "y": 649, "w": 260, "h": 76, "kind": "train_car"},
+        {"x": 940, "y": 649, "w": 260, "h": 76, "kind": "train_car"},
+        {"x": 540, "y": 415, "w": 66, "h": 70, "kind": "pillar"},
+        {"x": 794, "y": 415, "w": 66, "h": 70, "kind": "pillar"},
+    ],
+    "dock": [
+        {"x": 230, "y": 200, "w": 210, "h": 68, "kind": "container"},
+        {"x": 960, "y": 200, "w": 210, "h": 68, "kind": "container"},
+        {"x": 230, "y": 632, "w": 210, "h": 68, "kind": "container"},
+        {"x": 960, "y": 632, "w": 210, "h": 68, "kind": "container"},
+        {"x": 615, "y": 210, "w": 170, "h": 54, "kind": "crate"},
+        {"x": 615, "y": 636, "w": 170, "h": 54, "kind": "crate"},
+        {"x": 195, "y": 405, "w": 70, "h": 90, "kind": "container"},
+        {"x": 1135, "y": 405, "w": 70, "h": 90, "kind": "container"},
+    ],
+    "reactor": [
+        {"x": 635, "y": 385, "w": 130, "h": 130, "kind": "reactor"},
+        {"x": 270, "y": 205, "w": 96, "h": 96, "kind": "cooling_tower"},
+        {"x": 1034, "y": 205, "w": 96, "h": 96, "kind": "cooling_tower"},
+        {"x": 270, "y": 599, "w": 96, "h": 96, "kind": "cooling_tower"},
+        {"x": 1034, "y": 599, "w": 96, "h": 96, "kind": "cooling_tower"},
+        {"x": 450, "y": 424, "w": 64, "h": 52, "kind": "console"},
+        {"x": 886, "y": 424, "w": 64, "h": 52, "kind": "console"},
     ],
     "endless": [
         {"x": 300, "y": 260, "w": 90, "h": 90, "kind": "pillar"},
@@ -379,6 +430,9 @@ class ZombieRoom(SeatedRoom):
     MODES = {
         "outpost": {"label": "Căn Cứ Bỏ Hoang (10 Đợt)", "maxWaves": 10},
         "lab": {"label": "Phòng Thí Nghiệm Ngầm (15 Đợt)", "maxWaves": 15},
+        "metro": {"label": "Ga Tàu Điện Tử Thần (12 Đợt)", "maxWaves": 12},
+        "dock": {"label": "Bến Cảng Container (12 Đợt)", "maxWaves": 12},
+        "reactor": {"label": "Lò Phản Ứng Hạt Nhân (15 Đợt)", "maxWaves": 15},
         "endless": {"label": "Tử Thủ Vô Tận (Endless)", "maxWaves": 0},
     }
 
@@ -425,12 +479,16 @@ class ZombieRoom(SeatedRoom):
         self.last_tick_at: float = 0.0
         self.survivors: dict[str, dict] = {}
         self.zombies: list[dict] = []
-        self.projectiles: list[dict] = []  # Đạn axit Spitter/Boss, lựu đạn & tên lửa M79
-        self.hazards: list[dict] = []      # Vũng axit độc trên mặt đất
+        self.projectiles: list[dict] = []  # Đạn axit Spitter/Boss, lựu đạn nổ/băng/EMP & tên lửa M79
+        self.hazards: list[dict] = []      # Vũng axit độc & vùng bão băng Cryo trên mặt đất
         self.telegraphs: list[dict] = []   # Vòng cảnh báo chiêu đặc biệt của Mini-Boss / Boss
-        self.turrets: list[dict] = []      # Trụ súng tự động Sentry
-        self.pickups: list[dict] = []      # Vật phẩm rơi (Máu, Đạn, Tiền)
+        self.turrets: list[dict] = []      # Trụ súng tự động Sentry (có HP & đạn)
+        self.mines: list[dict] = []        # Mìn từ trường đặt trên sân
+        self.barrels: list[dict] = []      # Thùng phuy nhiên liệu đỏ bắn nổ chiến thuật
+        self.pickups: list[dict] = []      # Vật phẩm rơi (Máu, Đạn, Tiền & Power-Up toàn đội)
         self.events: list[dict] = []       # Ring buffer hiệu ứng VFX cho client 60 FPS
+        self.double_dmg_until: float = 0.0
+        self.inf_ammo_until: float = 0.0
         self.total_kills: int = 0
         self.match_started_at: float = 0.0
 
@@ -568,6 +626,9 @@ class ZombieRoom(SeatedRoom):
             "dashVy": 0.0,
             "stimUntil": 0.0,
             "grenades": int(spec["startGrenades"]),
+            "cryos": 1,
+            "emps": 1,
+            "mines": 1 if cls_id == "engineer" else 0,
             "turrets": int(spec["startTurrets"]),
             "money": 180,
             "score": 0,
@@ -630,11 +691,35 @@ class ZombieRoom(SeatedRoom):
         self.rng.shuffle(queue)
         return queue
 
+    def _spawn_wave_barrels(self) -> None:
+        """Sinh 4 thùng phuy nhiên liệu nổ tại các nút giao chiến thuật đầu mỗi đợt."""
+        self.barrels.clear()
+        obs = self._obstacles()
+        spots = [
+            (ARENA_W * 0.25, ARENA_H * 0.35),
+            (ARENA_W * 0.75, ARENA_H * 0.35),
+            (ARENA_W * 0.25, ARENA_H * 0.65),
+            (ARENA_W * 0.75, ARENA_H * 0.65),
+        ]
+        for bx, by in spots:
+            rx = bx + self.rng.uniform(-45.0, 45.0)
+            ry = by + self.rng.uniform(-35.0, 35.0)
+            rx, ry = _resolve_circle_obstacles(rx, ry, 24.0, obs)
+            self.barrels.append({
+                "id": self._next_id(),
+                "x": rx,
+                "y": ry,
+                "hp": 35.0,
+                "maxHp": 35.0,
+                "r": 16.0,
+            })
+
     def _begin_wave(self, wave_num: int) -> None:
         self.wave = wave_num
         self.phase = "wave"
         self.shop_deadline = 0.0
         self.telegraphs.clear()
+        self._spawn_wave_barrels()
         self.wave_remaining_to_spawn = self._build_wave_queue(wave_num)
         self.spawn_timer = 0.4
         # Hồi sinh các chiến binh đã hy sinh ở đợt trước với 75% HP
@@ -650,7 +735,7 @@ class ZombieRoom(SeatedRoom):
                 sv["bleedout"] = 0.0
                 sv["reviveProg"] = 0.0
                 sv["hp"] = round(sv["maxHp"] * 0.75, 1)
-                sv["armor"] = max(sv["armor"], 20.0)
+                sv["armor"] = min(sv["maxArmor"], max(sv["armor"], 20.0))
         boss_in_wave = next((k for k in ("titan", "boss", "butcher", "queen") if k in self.wave_remaining_to_spawn), "")
         has_major = boss_in_wave in ("boss", "titan")
         has_mini = boss_in_wave in ("butcher", "queen")
@@ -709,6 +794,8 @@ class ZombieRoom(SeatedRoom):
             "burnTimer": 0.0,
             "burnDps": 0.0,
             "burnOwner": "",
+            "slowTimer": 0.0,
+            "stunTimer": 0.0,
             "hitFlash": 0.0,
             "enraged": False,
             "skillLabel": "",
@@ -787,6 +874,7 @@ class ZombieRoom(SeatedRoom):
         if z["kind"] == "bloater":
             self.hazards.append({
                 "id": self._next_id(),
+                "kind": "acid",
                 "x": z["x"],
                 "y": z["y"],
                 "radius": 68.0,
@@ -795,7 +883,7 @@ class ZombieRoom(SeatedRoom):
             })
             self._emit("acid", x=round(z["x"], 1), y=round(z["y"], 1), radius=68)
 
-        # Rơi vật phẩm tiếp tế (tỷ lệ 16% hoặc 100% từ Brute/Mini-Boss/Boss)
+        # Rơi vật phẩm tiếp tế & Power-Up đặc biệt từ Tinh Anh / Mini-Boss / Boss
         if z["kind"] in ("brute", "butcher", "queen", "boss", "titan") or self.rng.random() < 0.16:
             pkind = self.rng.choices(["med", "ammo", "cash"], weights=[0.38, 0.37, 0.25], k=1)[0]
             self.pickups.append({
@@ -803,35 +891,65 @@ class ZombieRoom(SeatedRoom):
                 "kind": pkind,
                 "x": z["x"],
                 "y": z["y"],
-                "ttl": 16.0,
+                "ttl": 18.0,
             })
-            if z["kind"] in ("boss", "titan"):
+            # Power-Up toàn đội (Double Damage / Infinite Ammo / Tactical Nuke)
+            pu_chance = 1.0 if z["kind"] in ("boss", "titan") else (0.75 if z["kind"] in ("butcher", "queen") else (0.22 if z["kind"] == "brute" else 0.0))
+            if pu_chance > 0 and self.rng.random() < pu_chance:
+                pu_kind = self.rng.choices(["double_dmg", "inf_ammo", "nuke"], weights=[0.42, 0.38, 0.20], k=1)[0]
                 self.pickups.append({
                     "id": self._next_id(),
-                    "kind": "cash",
-                    "x": _clamp(z["x"] + 26.0, 40.0, ARENA_W - 40.0),
+                    "kind": pu_kind,
+                    "x": _clamp(z["x"] + 28.0, 40.0, ARENA_W - 40.0),
                     "y": z["y"],
-                    "ttl": 18.0,
+                    "ttl": 20.0,
                 })
         return True
+
+    def _detonate_barrel(self, b: dict, owner_mark: str) -> None:
+        """Kích nổ thùng phuy nhiên liệu đỏ trên sân -> 220 DMG AoE + đốt cháy + làm choáng!"""
+        if b["hp"] <= 0:
+            return
+        b["hp"] = 0.0
+        radius = 140.0
+        bx, by = b["x"], b["y"]
+        for z in list(self.zombies):
+            if z["hp"] <= 0:
+                continue
+            d = _dist(bx, by, z["x"], z["y"])
+            if d <= radius + z["radius"]:
+                falloff = max(0.45, 1.0 - d / (radius + 40.0))
+                ang = math.atan2(z["y"] - by, z["x"] - bx)
+                killed = self._damage_zombie(z, 220.0 * falloff, owner_mark, math.cos(ang) * 32.0, math.sin(ang) * 32.0)
+                if not killed:
+                    z["burnTimer"] = max(z["burnTimer"], 3.5)
+                    z["burnDps"] = max(z["burnDps"], 18.0)
+                    z["burnOwner"] = owner_mark
+                    if z["kind"] not in ("boss", "titan"):
+                        z["stunTimer"] = max(z["stunTimer"], 1.1)
+        self.zombies = [z for z in self.zombies if z["hp"] > 0]
+        self._emit("boom", x=round(bx, 1), y=round(by, 1), radius=int(radius))
 
     def _fire_weapon(self, sv: dict, now: float) -> None:
         if not sv["alive"] or sv["downed"] or sv["reloadUntil"] > now or sv["fireCd"] > now:
             return
         wid = sv["weapon"]
         w = WEAPONS[wid]
+        inf_ammo = self.inf_ammo_until > now
         cur_mag = sv["mag"].get(wid, 0)
-        if cur_mag <= 0:
+        if not inf_ammo and cur_mag <= 0:
             self._trigger_reload(sv, now)
             return
 
-        sv["mag"][wid] = cur_mag - 1
+        if not inf_ammo:
+            sv["mag"][wid] = max(0, cur_mag - 1)
         stim_rate = 0.84 if sv.get("stimUntil", 0.0) > now else 1.0
         sv["fireCd"] = now + w["rate"] * stim_rate
         cls_spec = CLASSES[sv["cls"]]
         w_lv = self._weapon_lv(sv, wid)
         lv_mult = 1.0 + 0.28 * (w_lv - 1)
-        dmg_mult = cls_spec["dmgMult"] * (1.0 + 0.20 * sv["perks"].get("damage", 0)) * lv_mult
+        team_mult = 1.5 if self.double_dmg_until > now else 1.0
+        dmg_mult = cls_spec["dmgMult"] * (1.0 + 0.20 * sv["perks"].get("damage", 0)) * lv_mult * team_mult
         per_dmg = w["dmg"] * dmg_mult
         obs = self._obstacles()
         base_angle = sv["aim"]
@@ -865,13 +983,77 @@ class ZombieRoom(SeatedRoom):
                 pts=[(round(muzzle_x + dx * 36.0, 1), round(muzzle_y + dy * 36.0, 1))],
                 color=tracer_color,
             )
-            if sv["mag"][wid] <= 0:
+            if not inf_ammo and sv["mag"][wid] <= 0:
+                self._trigger_reload(sv, now)
+            return
+
+        # Súng Hồ Quang Tesla: bắn sét giật chuyền qua tối đa 4 mục tiêu + gây choáng nhẹ & làm chậm!
+        if w.get("chain", 0) > 0:
+            dx, dy = math.cos(base_angle), math.sin(base_angle)
+            end_x = muzzle_x + dx * w["range"]
+            end_y = muzzle_y + dy * w["range"]
+            wall_t = 1.0
+            for ob in obs:
+                ht = _segment_hits_rect(muzzle_x, muzzle_y, end_x, end_y, ob)
+                if ht is not None and ht < wall_t:
+                    wall_t = ht
+            end_x = muzzle_x + dx * w["range"] * wall_t
+            end_y = muzzle_y + dy * w["range"] * wall_t
+
+            # Kiểm tra trúng thùng phuy nổ dọc tia sét
+            for b in list(self.barrels):
+                if b["hp"] > 0 and _ray_circle_t(muzzle_x, muzzle_y, end_x, end_y, b["x"], b["y"], b["r"] + 6.0) is not None:
+                    self._detonate_barrel(b, sv["mark"])
+            self.barrels = [b for b in self.barrels if b["hp"] > 0]
+
+            first_hit = None
+            best_t = 2.0
+            for z in self.zombies:
+                if z["hp"] <= 0:
+                    continue
+                zt = _ray_circle_t(muzzle_x, muzzle_y, end_x, end_y, z["x"], z["y"], z["radius"] + 14.0)
+                if zt is not None and zt < best_t:
+                    best_t = zt
+                    first_hit = z
+
+            chain_pts: list[tuple[float, float]] = [(round(muzzle_x, 1), round(muzzle_y, 1))]
+            hit_ids: set[int] = set()
+            if first_hit is not None:
+                cur = first_hit
+                max_jumps = int(w["chain"]) + (w_lv - 1)
+                for hop in range(max_jumps):
+                    hit_ids.add(cur["id"])
+                    chain_pts.append((round(cur["x"], 1), round(cur["y"], 1)))
+                    hop_dmg = per_dmg * (0.85 ** hop)
+                    killed = self._damage_zombie(cur, hop_dmg, sv["mark"], emit_hit=True)
+                    if not killed:
+                        cur["slowTimer"] = max(cur["slowTimer"], 1.8)
+                        if cur["kind"] not in ("boss", "titan"):
+                            cur["stunTimer"] = max(cur["stunTimer"], 0.45)
+                    # Tìm mục tiêu kế tiếp trong bán kính 190px
+                    nxt = None
+                    best_d = 190.0
+                    for cand in self.zombies:
+                        if cand["hp"] <= 0 or cand["id"] in hit_ids:
+                            continue
+                        cd = _dist(cur["x"], cur["y"], cand["x"], cand["y"])
+                        if cd < best_d:
+                            best_d = cd
+                            nxt = cand
+                    if nxt is None:
+                        break
+                    cur = nxt
+                self.zombies = [z for z in self.zombies if z["hp"] > 0]
+            else:
+                chain_pts.append((round(end_x, 1), round(end_y, 1)))
+
+            self._emit("chain", mark=sv["mark"], weapon=wid, lv=w_lv, pts=chain_pts, color=tracer_color)
+            if not inf_ammo and sv["mag"][wid] <= 0:
                 self._trigger_reload(sv, now)
             return
 
         tracers: list[tuple[float, float]] = []
         dead_ids: set[int] = set()
-        # Gộp sát thương theo từng zombie khi bắn đạn chùm (Shotgun/Flamer) để giảm số event gửi đi
         agg_hits: dict[int, list] = {}
 
         for _ in range(w["pellets"]):
@@ -881,7 +1063,6 @@ class ZombieRoom(SeatedRoom):
             end_x = muzzle_x + dx * w["range"]
             end_y = muzzle_y + dy * w["range"]
 
-            # Kiểm tra va chạm tường / vật cản
             wall_t = 1.0
             for ob in obs:
                 ht = _segment_hits_rect(muzzle_x, muzzle_y, end_x, end_y, ob)
@@ -890,7 +1071,17 @@ class ZombieRoom(SeatedRoom):
             end_x = muzzle_x + dx * w["range"] * wall_t
             end_y = muzzle_y + dy * w["range"] * wall_t
 
-            # Kiểm tra trúng zombie dọc theo tia bắn (hỗ trợ đạn xuyên pierce)
+            # Kiểm tra bắn trúng Thùng Phuy Nổ trên bản đồ
+            for b in list(self.barrels):
+                if b["hp"] <= 0:
+                    continue
+                bt = _ray_circle_t(muzzle_x, muzzle_y, end_x, end_y, b["x"], b["y"], b["r"] + 4.0)
+                if bt is not None:
+                    b["hp"] -= per_dmg
+                    if b["hp"] <= 0:
+                        self._detonate_barrel(b, sv["mark"])
+                    break
+
             hits: list[tuple[float, dict]] = []
             for z in self.zombies:
                 if z["hp"] <= 0 or z["id"] in dead_ids:
@@ -929,6 +1120,7 @@ class ZombieRoom(SeatedRoom):
         for hx, hy, total_dmg in agg_hits.values():
             self._emit("hit", x=round(hx, 1), y=round(hy, 1), dmg=int(round(total_dmg)), crit=(total_dmg >= 80))
 
+        self.barrels = [b for b in self.barrels if b["hp"] > 0]
         if dead_ids:
             self.zombies = [z for z in self.zombies if z["hp"] > 0]
 
@@ -943,25 +1135,30 @@ class ZombieRoom(SeatedRoom):
             pts=tracers[:5],
             color=tracer_color,
         )
-        if sv["mag"][wid] <= 0:
+        if not inf_ammo and sv["mag"][wid] <= 0:
             self._trigger_reload(sv, now)
 
-    def _throw_grenade(self, sv: dict, target_x: float, target_y: float) -> None:
-        if not sv["alive"] or sv["downed"] or sv["grenades"] <= 0:
+    def _throw_grenade(self, sv: dict, target_x: float, target_y: float, kind: str = "grenade") -> None:
+        if not sv["alive"] or sv["downed"]:
             return
-        sv["grenades"] -= 1
+        field = "grenades" if kind == "grenade" else ("cryos" if kind == "cryo" else "emps")
+        if sv.get(field, 0) <= 0:
+            return
+        sv[field] -= 1
         dx = target_x - sv["x"]
         dy = target_y - sv["y"]
         d = math.hypot(dx, dy)
-        max_throw = 380.0
+        max_throw = 390.0
         if d > max_throw and d > 1e-6:
             target_x = sv["x"] + (dx / d) * max_throw
             target_y = sv["y"] + (dy / d) * max_throw
         target_x = _clamp(target_x, 30.0, ARENA_W - 30.0)
         target_y = _clamp(target_y, 30.0, ARENA_H - 30.0)
+        radius = 135.0 if kind == "grenade" else (145.0 if kind == "cryo" else 155.0)
+        dmg = (195.0 if kind == "grenade" else (55.0 if kind == "cryo" else 45.0)) * (1.0 + 0.18 * sv["perks"].get("damage", 0))
         self.projectiles.append({
             "id": self._next_id(),
-            "kind": "grenade",
+            "kind": kind,
             "owner": sv["mark"],
             "x": sv["x"],
             "y": sv["y"],
@@ -970,10 +1167,28 @@ class ZombieRoom(SeatedRoom):
             "tx": target_x,
             "ty": target_y,
             "t": 0.0,
-            "dur": 0.58,
-            "radius": 135.0,
-            "dmg": 195.0 * (1.0 + 0.18 * sv["perks"].get("damage", 0)),
+            "dur": 0.56,
+            "radius": radius,
+            "dmg": dmg,
         })
+
+    def _deploy_mine(self, sv: dict) -> None:
+        if not sv["alive"] or sv["downed"] or sv.get("mines", 0) <= 0:
+            return
+        if len(self.mines) >= 6:
+            raise GameError("Đã đạt tối đa 6 mìn trên bản đồ.")
+        sv["mines"] -= 1
+        mx, my = _resolve_circle_obstacles(sv["x"], sv["y"], 14.0, self._obstacles())
+        self.mines.append({
+            "id": self._next_id(),
+            "owner": sv["mark"],
+            "x": mx,
+            "y": my,
+            "triggerR": 55.0,
+            "radius": 118.0,
+            "dmg": 220.0 * (1.0 + 0.18 * sv["perks"].get("damage", 0)),
+        })
+        self._emit("mine_set", x=round(mx, 1), y=round(my, 1), owner=sv["mark"])
 
     def _deploy_turret(self, sv: dict) -> None:
         if not sv["alive"] or sv["downed"] or sv["turrets"] <= 0:
@@ -985,12 +1200,15 @@ class ZombieRoom(SeatedRoom):
         tx = sv["x"] + math.cos(sv["aim"]) * 36.0
         ty = sv["y"] + math.sin(sv["aim"]) * 36.0
         tx, ty = _resolve_circle_obstacles(tx, ty, 16.0, self._obstacles())
+        max_hp = round(180.0 * cls_mult, 1)
         self.turrets.append({
             "id": self._next_id(),
             "owner": sv["mark"],
             "x": tx,
             "y": ty,
             "aim": sv["aim"],
+            "hp": max_hp,
+            "maxHp": max_hp,
             "ammo": int(round(90 * cls_mult)),
             "maxAmmo": int(round(90 * cls_mult)),
             "dmg": 20.0 * cls_mult,
@@ -1013,18 +1231,41 @@ class ZombieRoom(SeatedRoom):
         sv["dashCd"] = now + CLASSES[sv["cls"]]["dashCd"]
         self._emit("dash", mark=sv["mark"], x=round(sv["x"], 1), y=round(sv["y"], 1))
 
-    def _damage_survivor(self, sv: dict, dmg: float, now: float) -> None:
-        if not sv["alive"] or sv["downed"] or sv["dashUntil"] > now:
+    def _damage_survivor(
+        self,
+        sv: dict,
+        dmg: float,
+        now: float,
+        sx: float | None = None,
+        sy: float | None = None,
+        kind: str = "melee",
+    ) -> None:
+        if not sv["alive"] or sv["downed"] or sv["dashUntil"] > now or dmg <= 0:
             return
+        total_dmg = dmg
+        shield_dmg = 0.0
         if sv["armor"] > 0:
             absorbed = min(sv["armor"], dmg * 0.65)
             sv["armor"] = max(0.0, sv["armor"] - absorbed)
+            shield_dmg = absorbed
             dmg -= absorbed
         sv["hp"] -= dmg
+        # Phát sự kiện hurt để client vẽ vết cào, nháy viền máu đỏ & âm thanh bị đánh
+        if kind != "acid" or total_dmg >= 1.2:
+            self._emit(
+                "hurt",
+                mark=sv["mark"],
+                dmg=max(1, int(round(total_dmg))),
+                shieldDmg=int(round(shield_dmg)),
+                x=round(sv["x"], 1),
+                y=round(sv["y"], 1),
+                sx=round(sx, 1) if sx is not None else round(sv["x"], 1),
+                sy=round(sy, 1) if sy is not None else round(sv["y"], 1),
+                kind=kind,
+            )
         if sv["hp"] <= 0:
             sv["hp"] = 0.0
             sv["firing"] = False
-            # Nếu còn đồng đội khác đứng vững -> rơi vào trạng thái Gục Ngã (Downed) chờ cứu!
             others_standing = any(
                 m != sv["mark"] and o["alive"] and not o["downed"]
                 for m, o in self.survivors.items()
@@ -1040,10 +1281,10 @@ class ZombieRoom(SeatedRoom):
                 sv["alive"] = False
                 sv["downed"] = False
 
-    # ---- Mua sắm trong Armory Shop ----------------------------------------- #
+    # ---- Mua sắm trong Armory Shop (Chỉ mở khi đang chờ đợt tiếp theo!) ---- #
     def _buy_item(self, sv: dict, item: str) -> None:
-        if not sv["alive"] and self.phase != "shop":
-            raise GameError("Bạn chưa thể mua đồ lúc này.")
+        if self.phase != "shop":
+            raise GameError("Trạm Tiếp Tế chỉ mở mua đồ trong thời gian chờ đợt tiếp theo!")
         now = time.time()
 
         # Nâng cấp vũ khí (upgrade:rifle -> Mk.II / Mk.III)
@@ -1070,7 +1311,6 @@ class ZombieRoom(SeatedRoom):
         if item in WEAPONS:
             w = WEAPONS[item]
             if item in sv["weapons"]:
-                # Đã có súng -> nạp đầy đạn với 1/3 giá (tối thiểu 80$)
                 refill_cost = max(80, w["cost"] // 3)
                 if sv["money"] < refill_cost:
                     raise GameError(f"Cần ${refill_cost} để nạp đầy đạn {w['name']}.")
@@ -1121,6 +1361,16 @@ class ZombieRoom(SeatedRoom):
             sv["armor"] = min(sv["maxArmor"], sv["armor"] + 30.0)
             return
 
+        if item == "shield":
+            cost = SHOP_ITEMS["shield"]["cost"]
+            if sv["armor"] >= sv["maxArmor"] - 0.5:
+                raise GameError("Giáp (Shield) đã đầy 100%.")
+            if sv["money"] < cost:
+                raise GameError(f"Cần ${cost}.")
+            sv["money"] -= cost
+            sv["armor"] = sv["maxArmor"]
+            return
+
         if item == "ammo":
             cost = SHOP_ITEMS["ammo"]["cost"]
             if sv["money"] < cost:
@@ -1136,11 +1386,41 @@ class ZombieRoom(SeatedRoom):
         if item == "grenade":
             cost = SHOP_ITEMS["grenade"]["cost"]
             if sv["grenades"] >= 5:
-                raise GameError("Đã mang tối đa 5 lựu đạn.")
+                raise GameError("Đã mang tối đa 5 lựu đạn nổ.")
             if sv["money"] < cost:
                 raise GameError(f"Cần ${cost}.")
             sv["money"] -= cost
             sv["grenades"] = min(5, sv["grenades"] + 2)
+            return
+
+        if item == "cryo":
+            cost = SHOP_ITEMS["cryo"]["cost"]
+            if sv.get("cryos", 0) >= 5:
+                raise GameError("Đã mang tối đa 5 lựu đạn băng.")
+            if sv["money"] < cost:
+                raise GameError(f"Cần ${cost}.")
+            sv["money"] -= cost
+            sv["cryos"] = min(5, sv.get("cryos", 0) + 2)
+            return
+
+        if item == "emp":
+            cost = SHOP_ITEMS["emp"]["cost"]
+            if sv.get("emps", 0) >= 5:
+                raise GameError("Đã mang tối đa 5 lựu đạn EMP.")
+            if sv["money"] < cost:
+                raise GameError(f"Cần ${cost}.")
+            sv["money"] -= cost
+            sv["emps"] = min(5, sv.get("emps", 0) + 2)
+            return
+
+        if item == "mine":
+            cost = SHOP_ITEMS["mine"]["cost"]
+            if sv.get("mines", 0) >= 4:
+                raise GameError("Đã mang tối đa 4 mìn từ trường.")
+            if sv["money"] < cost:
+                raise GameError(f"Cần ${cost}.")
+            sv["money"] -= cost
+            sv["mines"] = min(4, sv.get("mines", 0) + 2)
             return
 
         if item == "turret":
@@ -1153,13 +1433,17 @@ class ZombieRoom(SeatedRoom):
             sv["turrets"] += 1
             return
 
-        if item == "shield":
-            cost = SHOP_ITEMS["shield"]["cost"]
+        if item == "repair":
+            cost = SHOP_ITEMS["repair"]["cost"]
+            my_turrets = [t for t in self.turrets if t["owner"] == sv["mark"]]
+            if not my_turrets:
+                raise GameError("Bạn chưa có trụ súng nào trên sân để sửa.")
             if sv["money"] < cost:
                 raise GameError(f"Cần ${cost}.")
             sv["money"] -= cost
-            sv["armor"] = max(sv["armor"], sv["maxArmor"]) + 25.0
-            sv["armor"] = min(sv["maxArmor"] + 40.0, sv["armor"])
+            for t in my_turrets:
+                t["hp"] = t["maxHp"]
+                t["ammo"] = t["maxAmmo"]
             return
 
         if item == "stim":
@@ -1175,43 +1459,17 @@ class ZombieRoom(SeatedRoom):
 
         raise GameError("Vật phẩm không tồn tại.")
 
-    # ---- Vòng lặp mô phỏng 15 Hz (Server Authoritative Tick) --------------- #
-    def tick(self, dt_override: float | None = None) -> bool:
-        if not self.in_progress():
-            return False
-        now = time.time()
-        dt = dt_override if dt_override is not None else min(0.12, max(0.01, now - self.last_tick_at))
-        self.last_tick_at = now
-
-        if self.phase == "shop":
-            # AI Bots tự mua đồ ở đầu pha shop
-            self._step_bots(dt, now)
-            humans = [
-                m for m in self.survivors
-                if (p := self.seat(m)) is not None and not p.bot and p.connected
-            ]
-            all_ready = bool(humans) and all(self.survivors[m]["readyShop"] for m in humans)
-            if all_ready or now >= self.shop_deadline:
-                self._begin_wave(self.wave + 1)
-            return True
-
-        if self.phase != "wave":
-            return False
-
-        # 1. Step AI Survivor Bots
-        self._step_bots(dt, now)
-
-        obs = self._obstacles()
-
-        # 2. Cập nhật vị trí chiến binh, thay đạn, hào quang Medic, cứu đồng đội
+    def _step_survivors_and_pickups(self, dt: float, now: float, obs: list[dict], allow_fire: bool) -> None:
+        """Cập nhật di chuyển, thay đạn, hào quang Medic, cứu đồng đội & nhặt đồ (chạy cả trong pha Shop và Wave!)."""
         for m, sv in self.survivors.items():
             if not sv["alive"]:
                 sv["moveVx"], sv["moveVy"] = 0.0, 0.0
                 continue
             if sv["downed"]:
                 sv["moveVx"], sv["moveVy"] = 0.0, 0.0
+                if not allow_fire:
+                    continue
                 sv["bleedout"] -= dt
-                # Tìm đồng đội đang đứng trong vòng cứu
                 rescuers = [
                     o for om, o in self.survivors.items()
                     if om != m and o["alive"] and not o["downed"]
@@ -1225,7 +1483,7 @@ class ZombieRoom(SeatedRoom):
                         sv["bleedout"] = 0.0
                         sv["reviveProg"] = 0.0
                         sv["hp"] = round(sv["maxHp"] * 0.45, 1)
-                        sv["armor"] = max(sv["armor"], 20.0)
+                        sv["armor"] = min(sv["maxArmor"], max(sv["armor"], 20.0))
                         helper = rescuers[0]
                         helper["revives"] += 1
                         helper["money"] += 85
@@ -1257,7 +1515,7 @@ class ZombieRoom(SeatedRoom):
                     sv["reserve"][wid] = sv["reserve"].get(wid, 0) - take
                 sv["reloadUntil"] = 0.0
 
-            # Di chuyển (Dash hoặc đi bộ)
+            # Di chuyển (Dash hoặc đi bộ — hoạt động mượt mà cả khi đang chờ Wave sau!)
             if sv["dashUntil"] > now:
                 mvx, mvy = sv["dashVx"], sv["dashVy"]
                 nx = sv["x"] + mvx * dt
@@ -1266,8 +1524,10 @@ class ZombieRoom(SeatedRoom):
                 spd = CLASSES[sv["cls"]]["speed"] * (1.0 + 0.12 * sv["perks"].get("speed", 0))
                 if sv.get("stimUntil", 0.0) > now:
                     spd *= 1.25
-                # Bị chậm lại khi đứng trên vũng axit
-                in_acid = any(_dist(sv["x"], sv["y"], h["x"], h["y"]) <= h["radius"] for h in self.hazards)
+                in_acid = any(
+                    h.get("kind", "acid") == "acid" and _dist(sv["x"], sv["y"], h["x"], h["y"]) <= h["radius"]
+                    for h in self.hazards
+                )
                 if in_acid:
                     spd *= 0.62
                 vx, vy = sv["vx"], sv["vy"]
@@ -1287,9 +1547,86 @@ class ZombieRoom(SeatedRoom):
                     if other["alive"] and not other["downed"] and _dist(sv["x"], sv["y"], other["x"], other["y"]) <= 140.0:
                         other["hp"] = min(other["maxHp"], other["hp"] + aura * dt)
 
-            # Bắn liên thanh khi giữ cò
-            if sv["firing"]:
+            if allow_fire and sv["firing"]:
                 self._fire_weapon(sv, now)
+
+        # Cập nhật Vật phẩm rơi & Power-Up toàn đội (nhặt được cả trong pha Shop và Wave!)
+        next_pickups: list[dict] = []
+        for pk in self.pickups:
+            pk["ttl"] -= dt
+            if pk["ttl"] <= 0:
+                continue
+            taken = False
+            for sv in self.survivors.values():
+                if not sv["alive"] or sv["downed"]:
+                    continue
+                if _dist(sv["x"], sv["y"], pk["x"], pk["y"]) <= PLAYER_RADIUS + 22.0:
+                    kind = pk["kind"]
+                    if kind == "med":
+                        sv["hp"] = min(sv["maxHp"], sv["hp"] + 32.0)
+                    elif kind == "ammo":
+                        wid = sv["weapon"]
+                        if WEAPONS[wid]["reserve"] != -1:
+                            sv["reserve"][wid] = sv["reserve"].get(wid, 0) + WEAPONS[wid]["mag"] * 2
+                    elif kind == "cash":
+                        sv["money"] += 75
+                    elif kind == "double_dmg":
+                        self.double_dmg_until = max(self.double_dmg_until, now) + 12.0
+                        self.system("🔥 POWER-UP: CUỒNG SÁT (+50% Sát thương toàn đội trong 12s)!")
+                    elif kind == "inf_ammo":
+                        self.inf_ammo_until = max(self.inf_ammo_until, now) + 10.0
+                        for o in self.survivors.values():
+                            ow = o["weapon"]
+                            o["mag"][ow] = self._weapon_mag_cap(o, ow)
+                            o["reloadUntil"] = 0.0
+                        self.system("♾️ POWER-UP: VÔ HẠN ĐẠN (Toàn đội bắn không tốn đạn 10s)!")
+                    elif kind == "nuke":
+                        for z in list(self.zombies):
+                            if z["hp"] <= 0:
+                                continue
+                            killed = self._damage_zombie(z, 350.0, sv["mark"], emit_hit=False)
+                            if not killed and z["kind"] not in ("boss", "titan"):
+                                z["stunTimer"] = max(z["stunTimer"], 2.0)
+                        self.zombies = [z for z in self.zombies if z["hp"] > 0]
+                        self._emit("nuke", x=round(pk["x"], 1), y=round(pk["y"], 1))
+                        self.system("☢️ POWER-UP: BOM HẠT NHÂN CHIẾN THUẬT — Quét sạch 350 sát thương toàn bản đồ!")
+                    self._emit("pickup", mark=sv["mark"], kind=kind, x=round(pk["x"], 1), y=round(pk["y"], 1))
+                    taken = True
+                    break
+            if not taken:
+                next_pickups.append(pk)
+        self.pickups = next_pickups
+
+    # ---- Vòng lặp mô phỏng 15 Hz (Server Authoritative Tick) --------------- #
+    def tick(self, dt_override: float | None = None) -> bool:
+        if not self.in_progress():
+            return False
+        now = time.time()
+        dt = dt_override if dt_override is not None else min(0.12, max(0.01, now - self.last_tick_at))
+        self.last_tick_at = now
+        obs = self._obstacles()
+
+        if self.phase == "shop":
+            # AI Bots tự mua đồ ở đầu pha shop & người chơi VẪN DI CHUYỂN TỰ DO, nhặt đồ, đặt trụ/mìn!
+            self._step_bots(dt, now)
+            self._step_survivors_and_pickups(dt, now, obs, allow_fire=False)
+            humans = [
+                m for m in self.survivors
+                if (p := self.seat(m)) is not None and not p.bot and p.connected
+            ]
+            all_ready = bool(humans) and all(self.survivors[m]["readyShop"] for m in humans)
+            if all_ready or now >= self.shop_deadline:
+                self._begin_wave(self.wave + 1)
+            return True
+
+        if self.phase != "wave":
+            return False
+
+        # 1. Step AI Survivor Bots
+        self._step_bots(dt, now)
+
+        # 2. Cập nhật vị trí chiến binh, thay đạn, hào quang Medic, cứu đồng đội & nhặt đồ
+        self._step_survivors_and_pickups(dt, now, obs, allow_fire=True)
 
         # 3. Sinh thêm Zombie từ hàng đợi đợt hiện tại
         max_active = min(44, 12 + self.wave * 2 + len(self.survivors) * 3)
@@ -1300,9 +1637,12 @@ class ZombieRoom(SeatedRoom):
                 self._spawn_one_zombie(kind)
                 self.spawn_timer = max(0.26, 1.05 - self.wave * 0.05)
 
-        # 4. Cập nhật Trụ súng Sentry tự động
+        # 4. Cập nhật Trụ súng Sentry tự động (có HP & đạn)
         next_turrets: list[dict] = []
         for t in self.turrets:
+            if t["hp"] <= 0:
+                self._emit("turret_boom", x=round(t["x"], 1), y=round(t["y"], 1))
+                continue
             if t["ammo"] <= 0:
                 continue
             next_turrets.append(t)
@@ -1337,23 +1677,86 @@ class ZombieRoom(SeatedRoom):
         self.turrets = next_turrets
         self.zombies = [z for z in self.zombies if z["hp"] > 0]
 
-        # 5. Cập nhật Đạn bay (Lựu đạn, Đạn Phóng Lựu M79 & Cầu axit Spitter/Boss)
+        # 4b. Cập nhật Mìn Từ Trường (Proximity Laser Mines)
+        next_mines: list[dict] = []
+        for mn in self.mines:
+            triggered = any(
+                z["hp"] > 0 and _dist(mn["x"], mn["y"], z["x"], z["y"]) <= mn["triggerR"] + z["radius"]
+                for z in self.zombies
+            )
+            if triggered:
+                for z in list(self.zombies):
+                    if z["hp"] <= 0:
+                        continue
+                    d = _dist(mn["x"], mn["y"], z["x"], z["y"])
+                    if d <= mn["radius"] + z["radius"]:
+                        falloff = max(0.45, 1.0 - d / (mn["radius"] + 35.0))
+                        ang = math.atan2(z["y"] - mn["y"], z["x"] - mn["x"])
+                        killed = self._damage_zombie(z, mn["dmg"] * falloff, mn["owner"], math.cos(ang) * 28.0, math.sin(ang) * 28.0)
+                        if not killed:
+                            if z["kind"] in ("boss", "titan"):
+                                z["slowTimer"] = max(z["slowTimer"], 2.0)
+                            else:
+                                z["stunTimer"] = max(z["stunTimer"], 1.5)
+                self.zombies = [z for z in self.zombies if z["hp"] > 0]
+                self._emit("boom", x=round(mn["x"], 1), y=round(mn["y"], 1), radius=int(mn["radius"]))
+            else:
+                next_mines.append(mn)
+        self.mines = next_mines
+
+        # 5. Cập nhật Đạn bay (Lựu đạn nổ/Băng/EMP, Đạn M79 Rocket & Cầu axit Spitter/Boss)
         next_proj: list[dict] = []
         for pr in self.projectiles:
-            if pr["kind"] == "grenade":
+            if pr["kind"] in ("grenade", "cryo", "emp"):
                 pr["t"] += dt
                 ratio = min(1.0, pr["t"] / pr["dur"])
                 pr["x"] = pr["sx"] + (pr["tx"] - pr["sx"]) * ratio
                 pr["y"] = pr["sy"] + (pr["ty"] - pr["sy"]) * ratio
                 if ratio >= 1.0:
-                    for z in list(self.zombies):
-                        d = _dist(pr["x"], pr["y"], z["x"], z["y"])
-                        if d <= pr["radius"] + z["radius"]:
-                            falloff = max(0.35, 1.0 - d / (pr["radius"] + 40.0))
-                            ang = math.atan2(z["y"] - pr["y"], z["x"] - pr["x"])
-                            self._damage_zombie(z, pr["dmg"] * falloff, pr["owner"], math.cos(ang) * 28.0, math.sin(ang) * 28.0)
+                    if pr["kind"] == "grenade":
+                        for b in list(self.barrels):
+                            if b["hp"] > 0 and _dist(pr["x"], pr["y"], b["x"], b["y"]) <= pr["radius"] + b["r"]:
+                                self._detonate_barrel(b, pr["owner"])
+                        self.barrels = [b for b in self.barrels if b["hp"] > 0]
+                        for z in list(self.zombies):
+                            d = _dist(pr["x"], pr["y"], z["x"], z["y"])
+                            if d <= pr["radius"] + z["radius"]:
+                                falloff = max(0.35, 1.0 - d / (pr["radius"] + 40.0))
+                                ang = math.atan2(z["y"] - pr["y"], z["x"] - pr["x"])
+                                self._damage_zombie(z, pr["dmg"] * falloff, pr["owner"], math.cos(ang) * 28.0, math.sin(ang) * 28.0)
+                        self._emit("boom", x=round(pr["x"], 1), y=round(pr["y"], 1), radius=int(pr["radius"]))
+                    elif pr["kind"] == "cryo":
+                        # Lựu đạn băng tạo vùng bão tuyết làm chậm 65% trong 5.5s
+                        self.hazards.append({
+                            "id": self._next_id(),
+                            "kind": "cryo",
+                            "owner": pr["owner"],
+                            "x": pr["x"],
+                            "y": pr["y"],
+                            "radius": pr["radius"],
+                            "ttl": 5.5,
+                            "dps": 14.0,
+                        })
+                        for z in list(self.zombies):
+                            if _dist(pr["x"], pr["y"], z["x"], z["y"]) <= pr["radius"] + z["radius"]:
+                                killed = self._damage_zombie(z, pr["dmg"], pr["owner"])
+                                if not killed:
+                                    z["slowTimer"] = max(z["slowTimer"], 4.0)
+                        self._emit("cryo", x=round(pr["x"], 1), y=round(pr["y"], 1), radius=int(pr["radius"]))
+                    else:
+                        # Lựu đạn EMP làm choáng Stun 2.8s toàn bộ quái & ngắt chiêu Boss!
+                        for z in list(self.zombies):
+                            if _dist(pr["x"], pr["y"], z["x"], z["y"]) <= pr["radius"] + z["radius"]:
+                                killed = self._damage_zombie(z, pr["dmg"], pr["owner"])
+                                if not killed:
+                                    z["chargeTimer"] = 0.0
+                                    if z["kind"] in ("boss", "titan"):
+                                        z["slowTimer"] = max(z["slowTimer"], 3.5)
+                                        z["stunTimer"] = max(z["stunTimer"], 0.9)
+                                    else:
+                                        z["stunTimer"] = max(z["stunTimer"], 2.8)
+                        self._emit("emp", x=round(pr["x"], 1), y=round(pr["y"], 1), radius=int(pr["radius"]))
                     self.zombies = [z for z in self.zombies if z["hp"] > 0]
-                    self._emit("boom", x=round(pr["x"], 1), y=round(pr["y"], 1), radius=int(pr["radius"]))
                 else:
                     next_proj.append(pr)
             elif pr["kind"] == "rocket":
@@ -1368,8 +1771,16 @@ class ZombieRoom(SeatedRoom):
                     z["hp"] > 0 and _dist(pr["x"], pr["y"], z["x"], z["y"]) <= z["radius"] + 9.0
                     for z in self.zombies
                 )
+                hit_b = any(
+                    b["hp"] > 0 and _dist(pr["x"], pr["y"], b["x"], b["y"]) <= b["r"] + 8.0
+                    for b in self.barrels
+                )
                 out_bounds = not (0 <= pr["x"] <= ARENA_W and 0 <= pr["y"] <= ARENA_H)
-                if pr["ttl"] <= 0 or hit_wall or hit_z or out_bounds:
+                if pr["ttl"] <= 0 or hit_wall or hit_z or hit_b or out_bounds:
+                    for b in list(self.barrels):
+                        if b["hp"] > 0 and _dist(pr["x"], pr["y"], b["x"], b["y"]) <= pr["radius"] + b["r"]:
+                            self._detonate_barrel(b, pr["owner"])
+                    self.barrels = [b for b in self.barrels if b["hp"] > 0]
                     for z in list(self.zombies):
                         d = _dist(pr["x"], pr["y"], z["x"], z["y"])
                         if d <= pr["radius"] + z["radius"]:
@@ -1393,6 +1804,7 @@ class ZombieRoom(SeatedRoom):
                     if pr.get("spawnAcid") and not hit_wall and 10 <= pr["x"] <= ARENA_W - 10 and 10 <= pr["y"] <= ARENA_H - 10:
                         self.hazards.append({
                             "id": self._next_id(),
+                            "kind": "acid",
                             "x": pr["x"],
                             "y": pr["y"],
                             "radius": 52.0,
@@ -1400,13 +1812,19 @@ class ZombieRoom(SeatedRoom):
                             "dps": 15.0,
                         })
                     continue
-                hit_player = False
+                hit_something = False
                 for sv in self.survivors.values():
                     if sv["alive"] and not sv["downed"] and _dist(pr["x"], pr["y"], sv["x"], sv["y"]) <= PLAYER_RADIUS + 7.0:
-                        self._damage_survivor(sv, pr["dmg"], now)
-                        hit_player = True
+                        self._damage_survivor(sv, pr["dmg"], now, sx=pr["x"], sy=pr["y"], kind="projectile")
+                        hit_something = True
                         break
-                if not hit_player:
+                if not hit_something:
+                    for t in self.turrets:
+                        if t["hp"] > 0 and _dist(pr["x"], pr["y"], t["x"], t["y"]) <= 18.0:
+                            t["hp"] = max(0.0, t["hp"] - pr["dmg"])
+                            hit_something = True
+                            break
+                if not hit_something:
                     next_proj.append(pr)
         self.projectiles = next_proj
 
@@ -1417,8 +1835,7 @@ class ZombieRoom(SeatedRoom):
             if tg["t"] >= tg["dur"]:
                 for sv in self.survivors.values():
                     if sv["alive"] and not sv["downed"] and _dist(tg["x"], tg["y"], sv["x"], sv["y"]) <= tg["radius"] + PLAYER_RADIUS * 0.5:
-                        self._damage_survivor(sv, tg["dmg"], now)
-                        # Đẩy nhẹ người chơi ra ngoài khi trúng địa chấn
+                        self._damage_survivor(sv, tg["dmg"], now, sx=tg["x"], sy=tg["y"], kind="boss")
                         ang = math.atan2(sv["y"] - tg["y"], sv["x"] - tg["x"])
                         sv["x"], sv["y"] = _resolve_circle_obstacles(
                             sv["x"] + math.cos(ang) * 28.0,
@@ -1426,6 +1843,10 @@ class ZombieRoom(SeatedRoom):
                             PLAYER_RADIUS,
                             obs,
                         )
+                # Chiêu địa chấn / pháo kích của Boss cũng gây sát thương lên Trụ súng
+                for t in self.turrets:
+                    if t["hp"] > 0 and _dist(tg["x"], tg["y"], t["x"], t["y"]) <= tg["radius"] + 16.0:
+                        t["hp"] = max(0.0, t["hp"] - tg["dmg"] * 1.4)
                 self._emit(
                     "slam" if tg["kind"] == "slam" else "orbital",
                     x=round(tg["x"], 1),
@@ -1436,62 +1857,67 @@ class ZombieRoom(SeatedRoom):
                 next_tele.append(tg)
         self.telegraphs = next_tele
 
-        # 6. Cập nhật Vũng Axit độc trên mặt đất
+        # 6. Cập nhật Vũng Axit độc & Vùng Bão Băng Cryo trên mặt đất
         next_hazards: list[dict] = []
         for hz in self.hazards:
             hz["ttl"] -= dt
             if hz["ttl"] <= 0:
                 continue
             next_hazards.append(hz)
-            for sv in self.survivors.values():
-                if sv["alive"] and not sv["downed"] and _dist(sv["x"], sv["y"], hz["x"], hz["y"]) <= hz["radius"]:
-                    self._damage_survivor(sv, hz["dps"] * dt, now)
+            if hz.get("kind", "acid") == "cryo":
+                for z in list(self.zombies):
+                    if z["hp"] > 0 and _dist(z["x"], z["y"], hz["x"], hz["y"]) <= hz["radius"] + z["radius"] * 0.5:
+                        z["slowTimer"] = max(z["slowTimer"], 0.45)
+                        self._damage_zombie(z, hz["dps"] * dt, hz.get("owner", ""), emit_hit=False)
+            else:
+                for sv in self.survivors.values():
+                    if sv["alive"] and not sv["downed"] and _dist(sv["x"], sv["y"], hz["x"], hz["y"]) <= hz["radius"]:
+                        self._damage_survivor(sv, hz["dps"] * dt, now, sx=hz["x"], sy=hz["y"], kind="acid")
         self.hazards = next_hazards
+        self.zombies = [z for z in self.zombies if z["hp"] > 0]
 
-        # 7. Cập nhật Vật phẩm rơi (Pickups)
-        next_pickups: list[dict] = []
-        for pk in self.pickups:
-            pk["ttl"] -= dt
-            if pk["ttl"] <= 0:
-                continue
-            taken = False
-            for sv in self.survivors.values():
-                if not sv["alive"] or sv["downed"]:
-                    continue
-                if _dist(sv["x"], sv["y"], pk["x"], pk["y"]) <= PLAYER_RADIUS + 20.0:
-                    if pk["kind"] == "med":
-                        sv["hp"] = min(sv["maxHp"], sv["hp"] + 32.0)
-                    elif pk["kind"] == "ammo":
-                        wid = sv["weapon"]
-                        if WEAPONS[wid]["reserve"] != -1:
-                            sv["reserve"][wid] = sv["reserve"].get(wid, 0) + WEAPONS[wid]["mag"] * 2
-                    else:
-                        sv["money"] += 75
-                    self._emit("pickup", mark=sv["mark"], kind=pk["kind"], x=round(pk["x"], 1), y=round(pk["y"], 1))
-                    taken = True
-                    break
-            if not taken:
-                next_pickups.append(pk)
-        self.pickups = next_pickups
-
-        # 8. Cập nhật AI & Va chạm Zombie (bao gồm Mini-Boss & Final Boss)
+        # 8. Cập nhật AI & Va chạm Zombie (bao gồm Mini-Boss, Final Boss, Stun/Slow & đánh Trụ súng)
         standing = [sv for sv in self.survivors.values() if sv["alive"] and not sv["downed"]]
         for z in list(self.zombies):
             if z["hp"] <= 0:
                 continue
             if z["hitFlash"] > 0:
                 z["hitFlash"] = max(0.0, z["hitFlash"] - dt)
+            if z["slowTimer"] > 0:
+                z["slowTimer"] = max(0.0, z["slowTimer"] - dt)
             if z["burnTimer"] > 0:
                 z["burnTimer"] -= dt
                 if self._damage_zombie(z, z["burnDps"] * dt, z["burnOwner"]):
                     continue
 
+            # Nếu đang bị CHOÁNG (EMP / Tesla / Mìn) -> đứng im hoàn toàn!
+            if z["stunTimer"] > 0:
+                z["stunTimer"] = max(0.0, z["stunTimer"] - dt)
+                z["vx"], z["vy"] = 0.0, 0.0
+                z["chargeTimer"] = 0.0
+                continue
+
             if not standing:
                 z["vx"], z["vy"] = 0.0, 0.0
                 continue
             target_sv = min(standing, key=lambda s: _dist(z["x"], z["y"], s["x"], s["y"]))
-            dx = target_sv["x"] - z["x"]
-            dy = target_sv["y"] - z["y"]
+            d_sv = _dist(z["x"], z["y"], target_sv["x"], target_sv["y"])
+
+            # Kiểm tra xem có Trụ súng Sentry nào nằm sát đường hoặc rất gần -> Zombie lao vào đập Trụ!
+            target_turret = None
+            d_tr = float("inf")
+            for t in self.turrets:
+                if t["hp"] <= 0:
+                    continue
+                td = _dist(z["x"], z["y"], t["x"], t["y"])
+                if td < d_tr:
+                    d_tr = td
+                    target_turret = t
+            attacking_turret = target_turret is not None and d_tr < min(135.0, d_sv * 0.85)
+            tx_pos = target_turret["x"] if attacking_turret else target_sv["x"]
+            ty_pos = target_turret["y"] if attacking_turret else target_sv["y"]
+            dx = tx_pos - z["x"]
+            dy = ty_pos - z["y"]
             d = math.hypot(dx, dy) or 1.0
             nx_dir, ny_dir = dx / d, dy / d
 
@@ -1519,7 +1945,6 @@ class ZombieRoom(SeatedRoom):
                     "ttl": 1.6,
                 })
             elif z["kind"] == "butcher" and d <= 260.0 and z["specialCd"] <= 0:
-                # Mini-Boss Đao Đồ Tể: Lao tới & Chém Xoáy Địa Chấn (có vòng đỏ cảnh báo 0.65s)
                 z["specialCd"] = 4.0
                 z["chargeTimer"] = 0.45
                 z["chargeVx"] = nx_dir * 340.0
@@ -1539,7 +1964,6 @@ class ZombieRoom(SeatedRoom):
                     "dmg": 34.0,
                 })
             elif z["kind"] == "queen" and 110.0 <= d <= 520.0 and z["specialCd"] <= 0:
-                # Mini-Boss Mẫu Hậu Độc Dược: Bắn quạt 5 cầu axit + triệu hồi 2 Runner
                 z["specialCd"] = 4.2
                 z["skillLabel"] = "MƯA AXIT ĐỘC"
                 z["skillLabelUntil"] = now + 1.5
@@ -1585,11 +2009,9 @@ class ZombieRoom(SeatedRoom):
                         self._spawn_one_zombie("runner")
                         self._spawn_one_zombie("runner")
             elif z["kind"] == "titan" and z["specialCd"] <= 0:
-                # Final Boss Bạo Chúa Hủy Diệt: Pháo Kích Nhiệt Hạch + Xung Lửa Xoắn Ốc
                 z["specialCd"] = 3.2 if z["enraged"] else 4.4
                 z["skillLabel"] = "PHÁO KÍCH NHIỆT HẠCH"
                 z["skillLabelUntil"] = now + 2.0
-                # Khóa 3 vùng mục tiêu quanh các chiến binh đang đứng vững
                 targets = list(standing)
                 self.rng.shuffle(targets)
                 for idx_t in range(min(3, max(2, len(targets)))):
@@ -1606,7 +2028,6 @@ class ZombieRoom(SeatedRoom):
                         "dur": 1.05 if z["enraged"] else 1.2,
                         "dmg": 42.0,
                     })
-                # Khi Cuồng Bạo: bắn thêm vòng đạn năng lượng 12 hướng
                 if z["enraged"]:
                     for k in range(12):
                         ang = (math.tau / 12.0) * k + (now % 1.0)
@@ -1621,13 +2042,14 @@ class ZombieRoom(SeatedRoom):
                             "ttl": 2.0,
                         })
 
+            slow_mult = 0.35 if z["slowTimer"] > 0 else 1.0
             if z["chargeTimer"] > 0:
                 z["chargeTimer"] -= dt
-                mvx, mvy = z["chargeVx"], z["chargeVy"]
+                mvx, mvy = z["chargeVx"] * slow_mult, z["chargeVy"] * slow_mult
             elif z["kind"] in ("spitter", "queen") and d < 220.0:
-                mvx, mvy = -nx_dir * z["speed"] * 0.55, -ny_dir * z["speed"] * 0.55
+                mvx, mvy = -nx_dir * z["speed"] * 0.55 * slow_mult, -ny_dir * z["speed"] * 0.55 * slow_mult
             else:
-                mvx, mvy = nx_dir * z["speed"], ny_dir * z["speed"]
+                mvx, mvy = nx_dir * z["speed"] * slow_mult, ny_dir * z["speed"] * slow_mult
                 if z["kind"] == "runner":
                     wobble = math.sin(now * 7.0 + z["id"]) * 0.35
                     mvx, mvy = (
@@ -1638,11 +2060,16 @@ class ZombieRoom(SeatedRoom):
             z["vx"], z["vy"] = mvx, mvy
             z["x"], z["y"] = _resolve_circle_obstacles(z["x"] + mvx * dt, z["y"] + mvy * dt, z["radius"], obs)
 
-            # Tấn công cận chiến
-            z["atkCd"] = max(0.0, z["atkCd"] - dt)
-            if d <= z["radius"] + PLAYER_RADIUS + 8.0 and z["atkCd"] <= 0:
-                z["atkCd"] = 0.85
-                self._damage_survivor(target_sv, z["dmg"], now)
+            # Tấn công cận chiến (đánh Chiến binh hoặc đập Trụ súng Sentry!)
+            z["atkCd"] = max(0.0, z["atkCd"] - dt * slow_mult)
+            if z["atkCd"] <= 0:
+                if attacking_turret and target_turret is not None and d <= z["radius"] + 22.0:
+                    z["atkCd"] = 0.85
+                    target_turret["hp"] = max(0.0, target_turret["hp"] - z["dmg"])
+                    self._emit("turret_hit", x=round(target_turret["x"], 1), y=round(target_turret["y"], 1), dmg=int(round(z["dmg"])))
+                elif d_sv <= z["radius"] + PLAYER_RADIUS + 8.0:
+                    z["atkCd"] = 0.85
+                    self._damage_survivor(target_sv, z["dmg"], now, sx=z["x"], sy=z["y"], kind="melee")
 
         self.zombies = [z for z in self.zombies if z["hp"] > 0]
 
@@ -1830,7 +2257,7 @@ class ZombieRoom(SeatedRoom):
             return
 
         if action == "dash":
-            if self.phase == "wave":
+            if self.phase in ("wave", "shop"):
                 self._do_dash(sv, now)
             return
 
@@ -1838,7 +2265,29 @@ class ZombieRoom(SeatedRoom):
             if self.phase == "wave":
                 tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
                 ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
-                self._throw_grenade(sv, tx, ty)
+                gkind = str(msg.get("kind", "grenade")).strip()
+                if gkind not in ("grenade", "cryo", "emp"):
+                    gkind = "grenade"
+                self._throw_grenade(sv, tx, ty, kind=gkind)
+            return
+
+        if action == "cryo":
+            if self.phase == "wave":
+                tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
+                ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
+                self._throw_grenade(sv, tx, ty, kind="cryo")
+            return
+
+        if action == "emp":
+            if self.phase == "wave":
+                tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
+                ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
+                self._throw_grenade(sv, tx, ty, kind="emp")
+            return
+
+        if action == "mine":
+            if self.phase in ("wave", "shop"):
+                self._deploy_mine(sv)
             return
 
         if action == "turret":
@@ -1913,6 +2362,9 @@ class ZombieRoom(SeatedRoom):
                 "dashing": sv["dashUntil"] > now,
                 "stimLeft": max(0.0, round(sv.get("stimUntil", 0.0) - now, 1)),
                 "grenades": sv["grenades"],
+                "cryos": sv.get("cryos", 0),
+                "emps": sv.get("emps", 0),
+                "mines": sv.get("mines", 0),
                 "turrets": sv["turrets"],
                 "money": sv["money"],
                 "score": sv["score"],
@@ -1934,6 +2386,10 @@ class ZombieRoom(SeatedRoom):
             "totalKills": self.total_kills,
             "zombiesLeft": len(self.zombies) + len(self.wave_remaining_to_spawn),
             "shopLeft": max(0.0, round(self.shop_deadline - now, 1)) if self.phase == "shop" else 0.0,
+            "buffs": {
+                "doubleDmg": max(0.0, round(self.double_dmg_until - now, 1)),
+                "infAmmo": max(0.0, round(self.inf_ammo_until - now, 1)),
+            },
             "boss": boss_primary,
             "bosses": boss_list,
             "survivors": sv_out,
@@ -1949,6 +2405,8 @@ class ZombieRoom(SeatedRoom):
                     "maxHp": round(z["maxHp"], 1),
                     "r": z["radius"],
                     "burn": z["burnTimer"] > 0,
+                    "slow": z.get("slowTimer", 0.0) > 0,
+                    "stun": z.get("stunTimer", 0.0) > 0,
                     "flash": z["hitFlash"] > 0,
                     "charging": z["chargeTimer"] > 0,
                     "enraged": bool(z.get("enraged", False)),
@@ -1961,12 +2419,12 @@ class ZombieRoom(SeatedRoom):
                     "kind": pr["kind"],
                     "x": round(pr["x"], 1),
                     "y": round(pr["y"], 1),
-                    "t": round(pr.get("t", 0.0) / max(0.01, pr.get("dur", 1.0)), 2) if pr["kind"] == "grenade" else 0.0,
+                    "t": round(pr.get("t", 0.0) / max(0.01, pr.get("dur", 1.0)), 2) if pr["kind"] in ("grenade", "cryo", "emp") else 0.0,
                 }
                 for pr in self.projectiles
             ],
             "hazards": [
-                {"id": h["id"], "x": round(h["x"], 1), "y": round(h["y"], 1), "r": h["radius"], "ttl": round(h["ttl"], 1)}
+                {"id": h["id"], "kind": h.get("kind", "acid"), "x": round(h["x"], 1), "y": round(h["y"], 1), "r": h["radius"], "ttl": round(h["ttl"], 1)}
                 for h in self.hazards
             ],
             "telegraphs": [
@@ -1981,8 +2439,25 @@ class ZombieRoom(SeatedRoom):
                 for tg in self.telegraphs
             ],
             "turrets": [
-                {"id": t["id"], "x": round(t["x"], 1), "y": round(t["y"], 1), "aim": round(t["aim"], 2), "ammo": t["ammo"], "maxAmmo": t["maxAmmo"]}
+                {
+                    "id": t["id"],
+                    "x": round(t["x"], 1),
+                    "y": round(t["y"], 1),
+                    "aim": round(t["aim"], 2),
+                    "hp": round(t["hp"], 1),
+                    "maxHp": round(t["maxHp"], 1),
+                    "ammo": t["ammo"],
+                    "maxAmmo": t["maxAmmo"],
+                }
                 for t in self.turrets
+            ],
+            "mines": [
+                {"id": m["id"], "x": round(m["x"], 1), "y": round(m["y"], 1), "r": m["triggerR"]}
+                for m in self.mines
+            ],
+            "barrels": [
+                {"id": b["id"], "x": round(b["x"], 1), "y": round(b["y"], 1), "r": b["r"], "hp": round(b["hp"], 1), "maxHp": round(b["maxHp"], 1)}
+                for b in self.barrels
             ],
             "pickups": [
                 {"id": pk["id"], "kind": pk["kind"], "x": round(pk["x"], 1), "y": round(pk["y"], 1)}
@@ -2003,6 +2478,7 @@ class ZombieRoom(SeatedRoom):
                         "pierce": v["pierce"],
                         "splash": v.get("splash", 0.0),
                         "burn": v.get("burn", 0.0),
+                        "chain": v.get("chain", 0),
                         "color": v["color"],
                     }
                     for k, v in WEAPONS.items()
