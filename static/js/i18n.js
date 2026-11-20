@@ -1925,6 +1925,9 @@ const MODE_META = {
   zombie: {
     outpost: { vi: 'Căn Cứ Bỏ Hoang (10 Đợt)', en: 'Abandoned Outpost (10 Waves)' },
     lab: { vi: 'Phòng Thí Nghiệm Ngầm (15 Đợt)', en: 'Bio-Hazard Lab (15 Waves)' },
+    metro: { vi: 'Ga Tàu Điện Tử Thần (12 Đợt)', en: 'Dead Metro Station (12 Waves)' },
+    dock: { vi: 'Bến Cảng Container (12 Đợt)', en: 'Foggy Container Dock (12 Waves)' },
+    reactor: { vi: 'Lò Phản Ứng Hạt Nhân (15 Đợt)', en: 'Nuclear Core Reactor (15 Waves)' },
     endless: { vi: 'Tử Thủ Vô Tận (Endless)', en: 'Blood Moon Endless' },
   },
 };
