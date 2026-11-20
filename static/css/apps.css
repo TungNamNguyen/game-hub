@@ -3355,20 +3355,20 @@ body.geo-stage-active *::selection {
 
 .zombie-bottom-hud {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
   z-index: 5;
 }
 .z-hud-box {
   pointer-events: auto;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.86);
   backdrop-filter: blur(8px);
@@ -3376,7 +3376,38 @@ body.geo-stage-active *::selection {
   color: #f8fafc;
 }
 .z-vitals {
-  min-width: 190px;
+  width: 158px;
+  flex-shrink: 0;
+}
+.z-vitals .spread {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.z-weapons {
+  width: 214px;
+  flex-shrink: 0;
+}
+.z-weapon-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  flex-wrap: nowrap;
+  height: 20px;
+  overflow: hidden;
+}
+.z-weapon-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.z-ammo-txt {
+  min-width: 58px;
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .z-bar {
   width: 100%;
@@ -3399,21 +3430,27 @@ body.geo-stage-active *::selection {
 .z-tactical {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
+  padding: 6px 7px;
 }
 .z-skill-btn {
   position: relative;
   overflow: hidden;
-  padding: 5px 10px;
+  padding: 4px 6px;
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: rgba(30, 41, 59, 0.9);
   color: #f8fafc;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  min-width: 96px;
+  min-width: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.z-dash-btn {
+  min-width: 88px;
 }
 .z-skill-btn.ready {
   border-color: rgba(74, 222, 128, 0.65);
@@ -3445,7 +3482,8 @@ body.geo-stage-active *::selection {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 175px;
+  min-width: 146px;
+  flex-shrink: 0;
 }
 .z-squad.six-col {
   display: grid;
