@@ -3277,6 +3277,20 @@ body.geo-stage-active *::selection {
   border-color: rgba(250, 204, 21, 0.55);
   color: #fde047;
 }
+.z-hud-pill.ok {
+  border-color: rgba(74, 222, 128, 0.55);
+  color: #86efac;
+}
+
+.zombie-hurt-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(220, 38, 38, 0) 48%, rgba(220, 38, 38, 0.72) 100%);
+  transition: opacity 0.06s linear;
+}
 
 .zombie-boss-hud {
   position: absolute;
@@ -3405,6 +3419,14 @@ body.geo-stage-active *::selection {
   border-color: rgba(74, 222, 128, 0.65);
   color: #bbf7d0;
 }
+.z-skill-btn.ready.cryo {
+  border-color: rgba(56, 189, 248, 0.72);
+  color: #bae6fd;
+}
+.z-skill-btn.ready.emp {
+  border-color: rgba(167, 139, 250, 0.72);
+  color: #ddd6fe;
+}
 .z-skill-btn.cooling {
   border-color: rgba(56, 189, 248, 0.45);
   color: #bae6fd;
@@ -3469,11 +3491,34 @@ body.geo-stage-active *::selection {
   z-index: 12;
 }
 .zombie-shop-modal {
-  width: min(880px, 96%);
+  width: min(900px, 96%);
   max-height: 92%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid rgba(56, 189, 248, 0.42);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.z-shop-lock-banner {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 600;
+}
+.z-shop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+.z-shop-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  padding-right: 4px;
 }
 .zombie-shop-wgrid {
   display: grid;
