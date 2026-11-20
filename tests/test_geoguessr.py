@@ -392,3 +392,29 @@ def test_oceania_balanced_weights_landmarks_and_natural_random():
         if len(recent) > 6:
             recent.pop(0)
     assert len(seen_ccs) >= 8, f"Expected at least 8 Oceania territories sampled, got {seen_ccs}"
+
+
+def test_rejects_gen1_lowres_black_panoramas():
+    from geoguessr import _is_valid_sv_resolution
+
+    # Gen 1 (2007 Magnetic Island, [1664, 3328], 4 levels) -> phải bị từ chối vì zoom=4 trả tile đen
+    gen1_node = [
+        [1],
+        [2, "wZ0F_Tn0SM9buh-vMnQPCA"],
+        [2, 2, [1664, 3328], [[[[208, 416]], [[416, 832]], [[832, 1664]], [[1664, 3328]]], [512, 512]]],
+    ]
+    assert _is_valid_sv_resolution(gen1_node) is False
+
+    # Gen 3 ([6656, 13312], 5 levels) & Gen 4 ([8192, 16384], 6 levels) -> hợp lệ
+    gen3_node = [
+        [1],
+        [2, "IZH8EY64eL9tsKna93R9sw"],
+        [2, 2, [6656, 13312], [[[[208, 416]], [[416, 832]], [[832, 1664]], [[1664, 3328]], [[3328, 6656]]], [512, 512]]],
+    ]
+    gen4_node = [
+        [1],
+        [2, "Xakh29ZgigMrrjqA2Mq4Tg"],
+        [2, 2, [8192, 16384], [[[[256, 512]], [[512, 1024]], [[1024, 2048]], [[2048, 4096]], [[4096, 8192]], [[8192, 16384]]], [512, 512]]],
+    ]
+    assert _is_valid_sv_resolution(gen3_node) is True
+    assert _is_valid_sv_resolution(gen4_node) is True
