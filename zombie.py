@@ -712,6 +712,7 @@ class ZombieRoom(SeatedRoom):
                 "hp": 35.0,
                 "maxHp": 35.0,
                 "r": 16.0,
+                "detonated": False,
             })
 
     def _begin_wave(self, wave_num: int) -> None:
@@ -907,28 +908,32 @@ class ZombieRoom(SeatedRoom):
         return True
 
     def _detonate_barrel(self, b: dict, owner_mark: str) -> None:
-        """Kích nổ thùng phuy nhiên liệu đỏ trên sân -> 220 DMG AoE + đốt cháy + làm choáng!"""
-        if b["hp"] <= 0:
+        """Kích nổ thùng phuy nhiên liệu đỏ trên sân -> 230 DMG AoE + đốt cháy + làm choáng + nổ dây chuyền!"""
+        if b.get("detonated"):
             return
+        b["detonated"] = True
         b["hp"] = 0.0
-        radius = 140.0
+        radius = 155.0
         bx, by = b["x"], b["y"]
         for z in list(self.zombies):
             if z["hp"] <= 0:
                 continue
             d = _dist(bx, by, z["x"], z["y"])
             if d <= radius + z["radius"]:
-                falloff = max(0.45, 1.0 - d / (radius + 40.0))
+                falloff = max(0.45, 1.0 - d / (radius + 45.0))
                 ang = math.atan2(z["y"] - by, z["x"] - bx)
-                killed = self._damage_zombie(z, 220.0 * falloff, owner_mark, math.cos(ang) * 32.0, math.sin(ang) * 32.0)
+                killed = self._damage_zombie(z, 230.0 * falloff, owner_mark, math.cos(ang) * 34.0, math.sin(ang) * 34.0)
                 if not killed:
-                    z["burnTimer"] = max(z["burnTimer"], 3.5)
-                    z["burnDps"] = max(z["burnDps"], 18.0)
+                    z["burnTimer"] = max(z["burnTimer"], 4.0)
+                    z["burnDps"] = max(z["burnDps"], 20.0)
                     z["burnOwner"] = owner_mark
                     if z["kind"] not in ("boss", "titan"):
-                        z["stunTimer"] = max(z["stunTimer"], 1.1)
+                        z["stunTimer"] = max(z["stunTimer"], 1.2)
         self.zombies = [z for z in self.zombies if z["hp"] > 0]
-        self._emit("boom", x=round(bx, 1), y=round(by, 1), radius=int(radius))
+        self._emit("boom", kind="barrel", x=round(bx, 1), y=round(by, 1), radius=int(radius))
+        for other in list(self.barrels):
+            if not other.get("detonated") and _dist(bx, by, other["x"], other["y"]) <= radius + other["r"]:
+                self._detonate_barrel(other, owner_mark)
 
     def _fire_weapon(self, sv: dict, now: float) -> None:
         if not sv["alive"] or sv["downed"] or sv["reloadUntil"] > now or sv["fireCd"] > now:
@@ -1072,14 +1077,18 @@ class ZombieRoom(SeatedRoom):
             end_y = muzzle_y + dy * w["range"] * wall_t
 
             # Kiểm tra bắn trúng Thùng Phuy Nổ trên bản đồ
+            barrel_hit_t = None
             for b in list(self.barrels):
-                if b["hp"] <= 0:
+                if b.get("detonated") or b["hp"] <= 0:
                     continue
-                bt = _ray_circle_t(muzzle_x, muzzle_y, end_x, end_y, b["x"], b["y"], b["r"] + 4.0)
+                bt = _ray_circle_t(muzzle_x, muzzle_y, end_x, end_y, b["x"], b["y"], b["r"] + 5.0)
                 if bt is not None:
+                    barrel_hit_t = bt
                     b["hp"] -= per_dmg
                     if b["hp"] <= 0:
                         self._detonate_barrel(b, sv["mark"])
+                    else:
+                        self._emit("barrel_hit", x=round(b["x"], 1), y=round(b["y"], 1))
                     break
 
             hits: list[tuple[float, dict]] = []
@@ -1113,8 +1122,9 @@ class ZombieRoom(SeatedRoom):
                 if pierced >= w["pierce"]:
                     break
 
-            tx = muzzle_x + (end_x - muzzle_x) * (final_t if pierced >= w["pierce"] else 1.0)
-            ty = muzzle_y + (end_y - muzzle_y) * (final_t if pierced >= w["pierce"] else 1.0)
+            stop_t = final_t if pierced >= w["pierce"] else (barrel_hit_t if (barrel_hit_t is not None and pierced == 0) else 1.0)
+            tx = muzzle_x + (end_x - muzzle_x) * stop_t
+            ty = muzzle_y + (end_y - muzzle_y) * stop_t
             tracers.append((round(tx, 1), round(ty, 1)))
 
         for hx, hy, total_dmg in agg_hits.values():
@@ -1685,6 +1695,10 @@ class ZombieRoom(SeatedRoom):
                 for z in self.zombies
             )
             if triggered:
+                for b in list(self.barrels):
+                    if not b.get("detonated") and _dist(mn["x"], mn["y"], b["x"], b["y"]) <= mn["radius"] + b["r"]:
+                        self._detonate_barrel(b, mn["owner"])
+                self.barrels = [b for b in self.barrels if b["hp"] > 0]
                 for z in list(self.zombies):
                     if z["hp"] <= 0:
                         continue
