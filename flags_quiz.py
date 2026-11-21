@@ -18,6 +18,8 @@ ALLOWED_QUESTION_COUNTS = (10, 15, 20)
 ALLOWED_ROUND_TIMES = (10, 15, 20, 30)
 REVEAL_SECONDS = 3.2
 GRACE_SECONDS = 0.15
+MAX_TYPING_TRIES = 5
+TYPING_COOLDOWN = 0.35
 
 
 def _load_countries() -> list[dict]:
@@ -199,6 +201,7 @@ class FlagsRoom(SeatedRoom):
         self.questions: list[dict] = []
         self.answers: dict[str, dict] = {}       # mark -> {"correct": bool, "choice": str, "text": str, "points": int, "ms": int}
         self.wrong_tries: dict[str, list[str]] = {}
+        self.last_try_at: dict[str, float] = {}
         self.history: list[dict] = []
         self.points: dict[str, int] = {m: 0 for m in self.SEATS}
         self.streaks: dict[str, int] = {m: 0 for m in self.SEATS}
@@ -266,6 +269,7 @@ class FlagsRoom(SeatedRoom):
         self.phase = "question"
         self.answers = {}
         self.wrong_tries = {}
+        self.last_try_at = {}
         now = time.time()
         self.started_at = now
         self.deadline = now + float(self.config.get("roundTime", 15))
@@ -399,10 +403,23 @@ class FlagsRoom(SeatedRoom):
             a_mode = self.config.get("answerMode", "choice")
 
             if a_mode == "choice":
-                choice = str(msg.get("choice", "")).strip().lower()
-                if not choice:
+                raw_choice = msg.get("choice")
+                choice_code = ""
+                options = q.get("options") or []
+                if isinstance(raw_choice, int) and not isinstance(raw_choice, bool):
+                    if 0 <= raw_choice < len(options):
+                        choice_code = options[raw_choice]["code"]
+                else:
+                    s_choice = str(raw_choice if raw_choice is not None else "").strip().lower()
+                    if s_choice.isdigit():
+                        idx = int(s_choice)
+                        if 0 <= idx < len(options):
+                            choice_code = options[idx]["code"]
+                    else:
+                        choice_code = s_choice
+                if not choice_code:
                     raise GameError("Chưa chọn đáp án.")
-                ok = choice == q["country"]["code"]
+                ok = choice_code == q["country"]["code"]
                 if ok:
                     pts, _ = self._score_hit(mark, elapsed)
                 else:
@@ -410,7 +427,7 @@ class FlagsRoom(SeatedRoom):
                     pts = 0
                 self.answers[mark] = {
                     "correct": ok,
-                    "choice": choice,
+                    "choice": choice_code,
                     "text": "",
                     "points": pts,
                     "ms": round(elapsed * 1000),
@@ -420,6 +437,9 @@ class FlagsRoom(SeatedRoom):
                 text = str(msg.get("text", "")).strip()[:80]
                 if not text:
                     raise GameError("Hãy nhập câu trả lời.")
+                if now - self.last_try_at.get(mark, 0.0) < TYPING_COOLDOWN:
+                    raise GameError("Gửi đáp án chậm lại một chút.")
+                self.last_try_at[mark] = now
                 ok = match_answer(text, q["country"], q["kind"])
                 if ok:
                     pts, _ = self._score_hit(mark, elapsed)
@@ -435,7 +455,18 @@ class FlagsRoom(SeatedRoom):
                     tries = self.wrong_tries.setdefault(mark, [])
                     tries.append(text)
                     self.touched = now
-                    return
+                    if len(tries) >= MAX_TYPING_TRIES:
+                        self.streaks[mark] = 0
+                        self.answers[mark] = {
+                            "correct": False,
+                            "choice": "",
+                            "text": text,
+                            "points": 0,
+                            "ms": round(elapsed * 1000),
+                            "skipped": False,
+                        }
+                    else:
+                        return
 
             self.touched = now
             if all(m in self.answers for m in self._seated_marks()):
@@ -541,14 +572,20 @@ class FlagsRoom(SeatedRoom):
         q_payload = None
         if q is not None and self.phase in ("question", "reveal"):
             c = q["country"]
+            is_reveal = self.phase == "reveal"
             next_c = (
                 self.questions[self.q_idx + 1]["country"]["code"]
-                if self.q_idx + 1 < len(self.questions)
+                if is_reveal and self.q_idx + 1 < len(self.questions)
                 else ""
             )
-            preload_urls = [
-                flag_svg_url(self.questions[i]["country"]["code"])
-                for i in range(self.q_idx + 1, min(len(self.questions), self.q_idx + 4))
+            safe_options = [
+                {
+                    "idx": idx,
+                    "labelVi": opt["labelVi"],
+                    "labelEn": opt["labelEn"],
+                    **({"code": opt["code"]} if is_reveal else {}),
+                }
+                for idx, opt in enumerate(q["options"])
             ]
             q_payload = {
                 "index": self.q_idx + 1,
@@ -556,11 +593,11 @@ class FlagsRoom(SeatedRoom):
                 "kind": q["kind"],
                 "flagUrl": flag_svg_url(c["code"]),
                 "nextFlagUrl": flag_svg_url(next_c) if next_c else "",
-                "preloadFlags": preload_urls,
+                "preloadFlags": [],
                 "promptCountryVi": c["nameVi"] if q["kind"] == "capital" else "",
                 "promptCountryEn": c["nameEn"] if q["kind"] == "capital" else "",
                 "continent": c["continent"],
-                "options": q["options"],
+                "options": safe_options,
             }
 
         reveal_payload = self.history[-1] if self.phase == "reveal" and self.history else None
