@@ -16,8 +16,10 @@ An toàn khi nhận ảnh:
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
+import os
 import re
 import secrets
 import threading
@@ -31,7 +33,9 @@ import db
 import hf_sync
 
 # Chặn ảnh kích thước pixel quá lớn gây tràn RAM khi giải mã (decompression bomb).
-Image.MAX_IMAGE_PIXELS = 40_000_000
+MAX_IMAGE_PIXELS = 25_000_000
+MAX_SIDE_PX = 8192
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 TEXT_MAX = 4000
 TITLE_MAX = 40
@@ -247,12 +251,44 @@ class ChatStore:
         except Exception:
             pass    # mất một dòng log không được làm sập chat
 
-    def _rewrite_log(self, channel: str) -> None:
-        """Ghi lại cả file. Dùng khi sửa/xóa tin nhắn cũ."""
+    @staticmethod
+    def _atomic_write_text(path: Path, text: str) -> None:
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         try:
-            with self._log_file(channel).open("w", encoding="utf-8") as handle:
-                for msg in self.messages[channel]:
-                    handle.write(json.dumps(msg, ensure_ascii=False) + "\n")
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, path)
+        finally:
+            with contextlib.suppress(OSError):
+                if tmp.exists():
+                    tmp.unlink()
+
+    def _rewrite_log(self, channel: str) -> None:
+        """Ghi lại file an toàn (atomic) khi sửa/xóa tin nhắn cũ mà KHÔNG cắt mất lịch sử trên đĩa."""
+        path = self._log_file(channel)
+        by_id = {m["id"]: m for m in self.messages.get(channel, []) if isinstance(m, dict) and "id" in m}
+        try:
+            out_lines: list[str] = []
+            seen: set[str] = set()
+            if path.exists():
+                for raw_line in path.read_text(encoding="utf-8").splitlines()[-HISTORY_ON_DISK:]:
+                    if not raw_line.strip():
+                        continue
+                    try:
+                        parsed = json.loads(raw_line)
+                    except Exception:
+                        continue
+                    mid = parsed.get("id") if isinstance(parsed, dict) else None
+                    if mid and mid in by_id:
+                        out_lines.append(json.dumps(by_id[mid], ensure_ascii=False))
+                        seen.add(mid)
+                    else:
+                        out_lines.append(raw_line)
+            for msg in self.messages.get(channel, []):
+                mid = msg.get("id")
+                if mid and mid not in seen:
+                    out_lines.append(json.dumps(msg, ensure_ascii=False))
+                    seen.add(mid)
+            self._atomic_write_text(path, ("\n".join(out_lines) + "\n") if out_lines else "")
         except Exception:
             pass
 
@@ -260,15 +296,19 @@ class ChatStore:
         try:
             data = {name: {"title": info["title"], "created": info["created"]}
                     for name, info in self.channels.items()}
-            self._meta_file.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                                       encoding="utf-8")
+            self._atomic_write_text(
+                self._meta_file,
+                json.dumps(data, ensure_ascii=False, indent=2),
+            )
         except Exception:
             pass
 
     def _save_reads(self) -> None:
         try:
-            self._reads_file.write_text(json.dumps(self.reads, ensure_ascii=False),
-                                        encoding="utf-8")
+            self._atomic_write_text(
+                self._reads_file,
+                json.dumps(self.reads, ensure_ascii=False),
+            )
         except Exception:
             pass
 
@@ -377,15 +417,17 @@ class ChatStore:
         image = None
         attached_file = None
 
+        # Lấy metadata ảnh/file bên ngoài self.lock để tránh giữ lock khi đọc đĩa hoặc tải lười từ HF.
+        if image_id:
+            image = self._image_meta(image_id)
+            if image is None:
+                raise ChatError("Ảnh không còn tồn tại.")
+        if file_id:
+            attached_file = self._file_meta(file_id, file_name)
+            if attached_file is None:
+                raise ChatError("File đính kèm không còn tồn tại.")
+
         with self.lock:
-            if image_id:
-                image = self._image_meta(image_id)
-                if image is None:
-                    raise ChatError("Ảnh không còn tồn tại.")
-            if file_id:
-                attached_file = self._file_meta(file_id, file_name)
-                if attached_file is None:
-                    raise ChatError("File đính kèm không còn tồn tại.")
             if not body and image is None and attached_file is None:
                 raise ChatError("Tin nhắn trống.")
 
@@ -546,10 +588,15 @@ class ChatStore:
             # Pillow là bên quyết định đây có phải ảnh hay không, không tin client.
             try:
                 with Image.open(io.BytesIO(raw)) as probe:
+                    pw, ph = probe.size
+                    if pw <= 0 or ph <= 0 or pw > MAX_SIDE_PX or ph > MAX_SIDE_PX or (pw * ph) > MAX_IMAGE_PIXELS:
+                        raise ChatError("Độ phân giải ảnh quá lớn (tối đa 25MP / 8192px).")
                     probe.verify()
                 with Image.open(io.BytesIO(raw)) as img:
                     fmt = (img.format or "").upper()
                     width, height = img.size
+                    if width <= 0 or height <= 0 or width > MAX_SIDE_PX or height > MAX_SIDE_PX or (width * height) > MAX_IMAGE_PIXELS:
+                        raise ChatError("Độ phân giải ảnh quá lớn (tối đa 25MP / 8192px).")
                     mode = img.mode
                     animated = getattr(img, "n_frames", 1) > 1
             except ChatError:
