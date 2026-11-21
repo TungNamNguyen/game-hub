@@ -323,17 +323,31 @@ export class Net {
   }
 
   _deliverBatch(seq, messages) {
-    if (typeof seq === 'number' && seq > 0) {
-      if (seq <= this.lastSeq) return;
-      this.lastSeq = seq;
+    if (!Array.isArray(messages) || !messages.length) {
+      if (typeof seq === 'number' && seq > this.lastSeq) this.lastSeq = seq;
+      return;
     }
-    if (!Array.isArray(messages)) return;
+    const hasPerMsgSeq = messages.some((m) => m && typeof m._seq === 'number');
+    if (!hasPerMsgSeq) {
+      if (typeof seq === 'number' && seq > 0) {
+        if (seq <= this.lastSeq) return;
+        this.lastSeq = seq;
+      }
+    }
     for (const msg of messages) {
-      if (msg && msg.ch === 'hub' && msg.t === 'pong' && typeof msg.ts === 'number') {
+      if (!msg || typeof msg !== 'object') continue;
+      if (typeof msg._seq === 'number') {
+        if (msg._seq <= this.lastSeq) continue;
+        this.lastSeq = msg._seq;
+      }
+      if (msg.ch === 'hub' && msg.t === 'pong' && typeof msg.ts === 'number') {
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
         this._recordPing(now - msg.ts);
       }
       this._dispatchMsg(msg);
+    }
+    if (typeof seq === 'number' && seq > this.lastSeq) {
+      this.lastSeq = seq;
     }
   }
 
