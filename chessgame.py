@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import time
 
-from games import GameError, SeatedRoom, other_mark
+from games import GameError, SeatedRoom, int_field, other_mark
 
 FILES = "abcdefgh"
 WHITE, BLACK = "w", "b"
@@ -448,8 +448,14 @@ class ChessRoom(SeatedRoom):
         return super().progress_token() + (len(self.moves),)
 
     def _remember(self) -> int:
-        """Ghi nhận vị trí hiện tại, trả về số lần nó đã xuất hiện."""
-        key = position_key(self.board, self.color_of(self.turn), self.castling, self.ep)
+        """Ghi nhận vị trí hiện tại, trả về số lần nó đã xuất hiện (theo luật FIDE về ô ep)."""
+        has_legal_ep = any(
+            m.get("flag") == "ep"
+            for moves in self.legal.values()
+            for m in moves
+        )
+        ep_key = self.ep if has_legal_ep else -1
+        key = position_key(self.board, self.color_of(self.turn), self.castling, ep_key)
         self.seen[key] = self.seen.get(key, 0) + 1
         return self.seen[key]
 
@@ -479,7 +485,7 @@ class ChessRoom(SeatedRoom):
     # ---- hành động --------------------------------------------------------- #
     def handle(self, uid: str, action: str, msg: dict) -> None:
         if action == "move":
-            self.move(uid, int(msg.get("from", -1)), int(msg.get("to", -1)),
+            self.move(uid, int_field(msg, "from", -1), int_field(msg, "to", -1),
                       str(msg.get("promo", "")).upper()[:1])
         elif action == "draw":
             self.offer_draw(uid)
@@ -539,6 +545,7 @@ class ChessRoom(SeatedRoom):
             "captured": {"X": list(self.captured["X"]), "O": list(self.captured["O"])},
             "moves_len": len(self.moves),
             "seen": dict(self.seen),
+            "clock_remain": dict(self.clock_remain),
         })
 
         piece = self.board[frm]
@@ -637,6 +644,8 @@ class ChessRoom(SeatedRoom):
 
     # ---- xin đi lại (Undo) ------------------------------------------------- #
     def _apply_undo_plies(self, plies: int) -> None:
+        if self.clock_initial > 0:
+            self._spend_clock(self.turn)
         snap = None
         for _ in range(plies):
             if self._undo_stack:
@@ -655,6 +664,11 @@ class ChessRoom(SeatedRoom):
         self.draw_offer = ""
         self.undo_offer = ""
         if self.clock_initial > 0:
+            saved_clk = snap.get("clock_remain")
+            if isinstance(saved_clk, dict):
+                for m in self.SEATS:
+                    if m in saved_clk:
+                        self.clock_remain[m] = min(self.clock_remain.get(m, saved_clk[m]), saved_clk[m])
             self.turn_started_at = time.time()
         self._refresh()
 
