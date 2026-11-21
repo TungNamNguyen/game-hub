@@ -86,6 +86,7 @@ LIVE_ROUNDS = 1                 # số ổ có đạn trong 6 ổ
 
 # ---- mốc thời gian của từng pha (giây) ------------------------------------- #
 TURN_SECONDS = 30.0             # đặc tả: mỗi lượt tối đa 30 giây
+AWAY_TURN_SECONDS = 6.0         # rút ngắn thời gian chờ khi người giữ lượt bị mất kết nối
 REVEAL_SECONDS = 3.0            # thời gian tối thiểu lật quân của lượt bị hô bịp
 REVEAL_STEP_SECONDS = 0.6       # khoảng cách lật từng lá một (giây)
 AIM_SECONDS = 3.4               # kề súng, xoay ổ đạn
@@ -367,6 +368,19 @@ class BluffRoom(SeatedRoom):
                        f"{RANK_NAME[DEVIL]} và đang trốn đâu đó trong bộ.", "devil")
         self.touched = time.time()
 
+    def _turn_seconds(self, seat: str) -> float:
+        p = self.seat(seat)
+        if p is not None and not p.bot and not p.connected:
+            return AWAY_TURN_SECONDS
+        return TURN_SECONDS
+
+    def disconnect(self, uid: str) -> None:
+        super().disconnect(uid)
+        if self.in_progress() and self.phase == "turn" and self.turn:
+            p = self.seat(self.turn)
+            if p is not None and not p.bot and not p.connected:
+                self.deadline = min(self.deadline, time.time() + AWAY_TURN_SECONDS)
+
     def _begin_turn(self, seat: str) -> None:
         self.phase = "turn"
         self.turn = seat
@@ -381,7 +395,7 @@ class BluffRoom(SeatedRoom):
             and self.last_play is not None
             and self.last_play.seat != seat
         )
-        self.deadline = time.time() + TURN_SECONDS
+        self.deadline = time.time() + self._turn_seconds(seat)
 
     def _advance_turn(self) -> None:
         nxt = self._next_actor(self.turn)
