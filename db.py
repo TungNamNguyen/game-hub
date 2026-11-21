@@ -17,8 +17,11 @@ create table if not exists public.profiles (
   uid text primary key,
   name text not null,
   color text not null,
+  token_hash text,
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists token_hash text;
 
 create table if not exists public.channels (
   name text primary key,
