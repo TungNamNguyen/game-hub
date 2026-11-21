@@ -26,7 +26,9 @@ from PIL import Image, ImageOps
 
 import hf_sync
 
-Image.MAX_IMAGE_PIXELS = 40_000_000
+MAX_IMAGE_PIXELS = 25_000_000
+MAX_SIDE_PX = 8192
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 AVATAR_SIZE = 256                      # ảnh lưu vuông, cạnh này, đủ nét cho avatar lg (40px) x6
@@ -73,9 +75,15 @@ class AvatarStore:
         with _AVATAR_SEMAPHORE:
             try:
                 with Image.open(io.BytesIO(raw)) as probe:
+                    pw, ph = probe.size
+                    if pw <= 0 or ph <= 0 or pw > MAX_SIDE_PX or ph > MAX_SIDE_PX or (pw * ph) > MAX_IMAGE_PIXELS:
+                        raise AvatarError("Độ phân giải ảnh quá lớn (tối đa 25MP / 8192px).")
                     probe.verify()
                 with Image.open(io.BytesIO(raw)) as img:
                     fmt = (img.format or "").upper()
+                    w, h = img.size
+                    if w <= 0 or h <= 0 or w > MAX_SIDE_PX or h > MAX_SIDE_PX or (w * h) > MAX_IMAGE_PIXELS:
+                        raise AvatarError("Độ phân giải ảnh quá lớn (tối đa 25MP / 8192px).")
             except AvatarError:
                 raise
             except Exception:
