@@ -2,9 +2,9 @@
 
 Lấy cảm hứng từ các cơ chế xuất sắc nhất của Left 4 Dead 2, Killing Floor 2, CoD Zombies & Alien Swarm:
   - 9 chủng Zombie, Mini-Boss & Boss Đột Biến (Walker, Runner, Bloater, Spitter, Brute, Đao Đồ Tể, Mẫu Hậu Độc Dược, Chúa Tể & Bạo Chúa Hủy Diệt)
-  - 4 lớp Chiến Binh (Assault, Medic, Engineer, Vanguard), 7 vũ khí có thể nâng cấp Mk.I–Mk.III & 5 Perk
+  - 4 lớp Chiến Binh (Assault, Medic, Engineer, Vanguard), 8 vũ khí có thể nâng cấp Mk.I–Mk.III & 5 Perk
   - Cơ chế Gục Ngã (Downed 15s) & Đồng đội cứu thương (Revive 2.5s), Lướt né (Dash), Lựu đạn, Trụ súng Sentry & Huyết thanh
-  - Pha Tiếp Tế giữa các đợt (Armory Shop 12s) để mua súng, nâng cấp Mk.II/III, giáp, trụ súng và kỹ năng
+  - Pha Tiếp Tế giữa các đợt (Armory Shop 16s) để mua súng, nâng cấp Mk.II/III, giáp, trụ súng và kỹ năng
   - Chạy mô phỏng authoritative ở 15 Hz phía server và nội suy Dead-Reckoning 60 FPS mượt mà ở client Canvas 2.5D
 """
 from __future__ import annotations
@@ -420,6 +420,54 @@ def _ray_circle_t(x1: float, y1: float, x2: float, y2: float, cx: float, cy: flo
     return None
 
 
+def _finite_float(val, default: float = 0.0) -> float:
+    """Ép sang float hữu hạn; chặn NaN/Infinity từ client làm đứng phòng hoặc lỗi JSON."""
+    try:
+        out = float(val)
+    except (TypeError, ValueError):
+        return default
+    return out if math.isfinite(out) else default
+
+
+def _steer_around_obstacles(
+    zx: float, zy: float, tx: float, ty: float, radius: float, obs: list[dict]
+) -> tuple[float, float]:
+    """Tính hướng di chuyển (nx, ny) có vòng qua góc vật cản nếu đường thẳng tới mục tiêu bị chắn."""
+    dx, dy = tx - zx, ty - zy
+    d = math.hypot(dx, dy) or 1.0
+    nx, ny = dx / d, dy / d
+    blocker = None
+    best_t = 2.0
+    for ob in obs:
+        ht = _segment_hits_rect(zx, zy, tx, ty, ob)
+        if ht is not None and ht < best_t:
+            best_t = ht
+            blocker = ob
+    if blocker is None:
+        return nx, ny
+    pad = radius + 22.0
+    corners = (
+        (blocker["x"] - pad, blocker["y"] - pad),
+        (blocker["x"] + blocker["w"] + pad, blocker["y"] - pad),
+        (blocker["x"] - pad, blocker["y"] + blocker["h"] + pad),
+        (blocker["x"] + blocker["w"] + pad, blocker["y"] + blocker["h"] + pad),
+    )
+    best_c = None
+    best_cost = float("inf")
+    for cx, cy in corners:
+        if not (24.0 <= cx <= ARENA_W - 24.0 and 24.0 <= cy <= ARENA_H - 24.0):
+            continue
+        cost = _dist(zx, zy, cx, cy) + _dist(cx, cy, tx, ty)
+        if cost < best_cost:
+            best_cost = cost
+            best_c = (cx, cy)
+    if best_c is None:
+        return nx, ny
+    cdx, cdy = best_c[0] - zx, best_c[1] - zy
+    cd = math.hypot(cdx, cdy) or 1.0
+    return cdx / cd, cdy / cd
+
+
 class ZombieRoom(SeatedRoom):
     CHANNEL = "zombie"
     SEATS = ("1", "2", "3", "4", "5", "6")
@@ -452,6 +500,8 @@ class ZombieRoom(SeatedRoom):
         }
         # Tăng đơn điệu xuyên suốt vòng đời phòng để client không bao giờ bỏ qua event sau Rematch
         self._event_seq: int = 0
+        self._last_broadcast_event_seq: int = 0
+        self._last_static_ver: tuple = ()
         self._entity_seq: int = 0
         self.match_id: int = 0
         self.reset_match()
@@ -721,6 +771,15 @@ class ZombieRoom(SeatedRoom):
         self.shop_deadline = 0.0
         self.telegraphs.clear()
         self._spawn_wave_barrels()
+        # Z7/Z16: Người chơi ngồi vào ghế giữa trận sẽ được triển khai tham chiến ở đầu đợt kế tiếp
+        for idx, m in enumerate(self._seated_marks()):
+            if m not in self.survivors:
+                sv_new = self._create_survivor(m, idx)
+                sv_new["money"] = 180 + max(0, wave_num - 1) * 140
+                self.survivors[m] = sv_new
+                p = self.seat(m)
+                if p:
+                    self.system(f"🪖 {p.name} đã nhảy dù tham chiến ở Đợt {wave_num}!")
         self.wave_remaining_to_spawn = self._build_wave_queue(wave_num)
         self.spawn_timer = 0.4
         # Hồi sinh các chiến binh đã hy sinh ở đợt trước với 75% HP
@@ -761,18 +820,28 @@ class ZombieRoom(SeatedRoom):
             hp = (spec["hp"] + self.wave * 95.0) * diff_hp * (1.0 + max(0, len(self.survivors) - 1) * 0.14)
         else:
             hp = spec["hp"] * diff_hp * wave_scale
-        # Sinh ở 4 rìa bản đồ
-        edge = self.rng.randint(0, 3)
+        # Sinh ở 4 rìa bản đồ, tránh spawn ngay sát người chơi đang đứng rìa (< 180px)
         pad = spec["radius"] + 16.0
-        if edge == 0:
-            x, y = self.rng.uniform(pad, ARENA_W - pad), pad
-        elif edge == 1:
-            x, y = self.rng.uniform(pad, ARENA_W - pad), ARENA_H - pad
-        elif edge == 2:
-            x, y = pad, self.rng.uniform(pad, ARENA_H - pad)
-        else:
-            x, y = ARENA_W - pad, self.rng.uniform(pad, ARENA_H - pad)
-        x, y = _resolve_circle_obstacles(x, y, spec["radius"], self._obstacles())
+        alive_svs = [sv for sv in self.survivors.values() if sv["alive"]]
+        best_pos = (pad, pad)
+        best_min_d = -1.0
+        for _ in range(6):
+            edge = self.rng.randint(0, 3)
+            if edge == 0:
+                cx, cy = self.rng.uniform(pad, ARENA_W - pad), pad
+            elif edge == 1:
+                cx, cy = self.rng.uniform(pad, ARENA_W - pad), ARENA_H - pad
+            elif edge == 2:
+                cx, cy = pad, self.rng.uniform(pad, ARENA_H - pad)
+            else:
+                cx, cy = ARENA_W - pad, self.rng.uniform(pad, ARENA_H - pad)
+            min_d = min((_dist(cx, cy, sv["x"], sv["y"]) for sv in alive_svs), default=9999.0)
+            if min_d > best_min_d:
+                best_min_d = min_d
+                best_pos = (cx, cy)
+            if min_d >= 180.0:
+                break
+        x, y = _resolve_circle_obstacles(best_pos[0], best_pos[1], spec["radius"], self._obstacles())
         z = {
             "id": self._next_id(),
             "kind": kind,
@@ -795,8 +864,10 @@ class ZombieRoom(SeatedRoom):
             "burnTimer": 0.0,
             "burnDps": 0.0,
             "burnOwner": "",
+            "burnHitCd": 0.0,
             "slowTimer": 0.0,
             "stunTimer": 0.0,
+            "teslaStunCd": 0.0,
             "hitFlash": 0.0,
             "enraged": False,
             "skillLabel": "",
@@ -949,7 +1020,9 @@ class ZombieRoom(SeatedRoom):
         if not inf_ammo:
             sv["mag"][wid] = max(0, cur_mag - 1)
         stim_rate = 0.84 if sv.get("stimUntil", 0.0) > now else 1.0
-        sv["fireCd"] = now + w["rate"] * stim_rate
+        eff_rate = w["rate"] * stim_rate
+        # Z5: Accumulator giữ phần dư thời gian giữa các tick 15 Hz để súng bắn nhanh (SMG/Flamer/Rifle) không bị hụt DPS
+        sv["fireCd"] = max(sv["fireCd"], now - 0.08) + eff_rate
         cls_spec = CLASSES[sv["cls"]]
         w_lv = self._weapon_lv(sv, wid)
         lv_mult = 1.0 + 0.28 * (w_lv - 1)
@@ -1033,8 +1106,9 @@ class ZombieRoom(SeatedRoom):
                     killed = self._damage_zombie(cur, hop_dmg, sv["mark"], emit_hit=True)
                     if not killed:
                         cur["slowTimer"] = max(cur["slowTimer"], 1.8)
-                        if cur["kind"] not in ("boss", "titan"):
-                            cur["stunTimer"] = max(cur["stunTimer"], 0.45)
+                        if cur["kind"] not in ("boss", "titan") and cur.get("teslaStunCd", 0.0) <= 0.0:
+                            cur["stunTimer"] = max(cur["stunTimer"], 0.38)
+                            cur["teslaStunCd"] = 1.35
                     # Tìm mục tiêu kế tiếp trong bán kính 190px
                     nxt = None
                     best_d = 190.0
@@ -1558,7 +1632,13 @@ class ZombieRoom(SeatedRoom):
                         other["hp"] = min(other["maxHp"], other["hp"] + aura * dt)
 
             if allow_fire and sv["firing"]:
-                self._fire_weapon(sv, now)
+                for _ in range(2):
+                    if not sv["alive"] or sv["downed"] or sv["reloadUntil"] > now or sv["fireCd"] > now:
+                        break
+                    prev_cd = sv["fireCd"]
+                    self._fire_weapon(sv, now)
+                    if sv["fireCd"] <= prev_cd:
+                        break
 
         # Cập nhật Vật phẩm rơi & Power-Up toàn đội (nhặt được cả trong pha Shop và Wave!)
         next_pickups: list[dict] = []
@@ -1577,7 +1657,8 @@ class ZombieRoom(SeatedRoom):
                     elif kind == "ammo":
                         wid = sv["weapon"]
                         if WEAPONS[wid]["reserve"] != -1:
-                            sv["reserve"][wid] = sv["reserve"].get(wid, 0) + WEAPONS[wid]["mag"] * 2
+                            max_res = WEAPONS[wid]["reserve"] * 2
+                            sv["reserve"][wid] = min(max_res, sv["reserve"].get(wid, 0) + WEAPONS[wid]["mag"] * 2)
                     elif kind == "cash":
                         sv["money"] += 75
                     elif kind == "double_dmg":
@@ -1671,7 +1752,7 @@ class ZombieRoom(SeatedRoom):
                         target_z = z
             if target_z is not None:
                 t["aim"] = math.atan2(target_z["y"] - t["y"], target_z["x"] - t["x"])
-                t["fireCd"] = now + t["rate"]
+                t["fireCd"] = max(t["fireCd"], now - 0.08) + t["rate"]
                 t["ammo"] -= 1
                 self._damage_zombie(target_z, t["dmg"], t["owner"])
                 self._emit(
@@ -1899,9 +1980,15 @@ class ZombieRoom(SeatedRoom):
                 z["hitFlash"] = max(0.0, z["hitFlash"] - dt)
             if z["slowTimer"] > 0:
                 z["slowTimer"] = max(0.0, z["slowTimer"] - dt)
+            if z.get("teslaStunCd", 0.0) > 0:
+                z["teslaStunCd"] = max(0.0, z["teslaStunCd"] - dt)
             if z["burnTimer"] > 0:
                 z["burnTimer"] -= dt
-                if self._damage_zombie(z, z["burnDps"] * dt, z["burnOwner"]):
+                z["burnHitCd"] = max(0.0, z.get("burnHitCd", 0.0) - dt)
+                emit_burn = z["burnHitCd"] <= 0.0
+                if emit_burn:
+                    z["burnHitCd"] = 0.4
+                if self._damage_zombie(z, z["burnDps"] * dt, z["burnOwner"], emit_hit=emit_burn):
                     continue
 
             # Nếu đang bị CHOÁNG (EMP / Tesla / Mìn) -> đứng im hoàn toàn!
@@ -2063,7 +2150,8 @@ class ZombieRoom(SeatedRoom):
             elif z["kind"] in ("spitter", "queen") and d < 220.0:
                 mvx, mvy = -nx_dir * z["speed"] * 0.55 * slow_mult, -ny_dir * z["speed"] * 0.55 * slow_mult
             else:
-                mvx, mvy = nx_dir * z["speed"] * slow_mult, ny_dir * z["speed"] * slow_mult
+                steer_x, steer_y = _steer_around_obstacles(z["x"], z["y"], tx_pos, ty_pos, z["radius"], obs)
+                mvx, mvy = steer_x * z["speed"] * slow_mult, steer_y * z["speed"] * slow_mult
                 if z["kind"] == "runner":
                     wobble = math.sin(now * 7.0 + z["id"]) * 0.35
                     mvx, mvy = (
@@ -2136,6 +2224,11 @@ class ZombieRoom(SeatedRoom):
             sv = self.survivors.get(p.mark)
             if sv is not None:
                 step_bot_survivor(self, p, sv, dt, now)
+        # Z3/Z15: Tạm giao survivor của người chơi mất kết nối cho AI tự vệ tới khi họ vào lại
+        for m, sv in self.survivors.items():
+            p = self.seat(m)
+            if p is not None and not p.bot and not p.connected:
+                step_bot_survivor(self, p, sv, dt, now)
 
     def _finish_match(self, victory: bool) -> None:
         self.victory = victory
@@ -2155,11 +2248,38 @@ class ZombieRoom(SeatedRoom):
         self.touched = time.time()
 
     # ---- Hành động từ Client ----------------------------------------------- #
+    def disconnect(self, uid: str) -> None:
+        player = self.players.get(uid)
+        if player is not None and player.mark and self.in_progress():
+            sv = self.survivors.get(player.mark)
+            if sv is not None:
+                sv["vx"] = 0.0
+                sv["vy"] = 0.0
+                sv["firing"] = False
+        super().disconnect(uid)
+
     def stand(self, uid: str) -> None:
         player = self.players.get(uid)
         if player is None or not player.mark:
             return
         mark = player.mark
+        if self.in_progress():
+            # Z2: Giữa trận chỉ rút riêng người này ra khỏi đội; không hủy trận của đồng đội còn lại!
+            player.mark = ""
+            self.rematch.discard(mark)
+            self.survivors.pop(mark, None)
+            self.system(f"{player.name} rời khỏi đội hình ({self._seat_label(mark)}).")
+            remaining_humans = [
+                m for m in self._seated_marks()
+                if (p := self.seat(m)) is not None and not p.bot
+            ]
+            if not remaining_humans or not self.survivors:
+                self.status = "waiting"
+                self.winner = ""
+                self.reset_match()
+                self.system("Trận đấu kết thúc vì không còn người chơi trong đội.")
+            self.touched = time.time()
+            return
         super().stand(uid)
         self.survivors.pop(mark, None)
 
@@ -2169,6 +2289,20 @@ class ZombieRoom(SeatedRoom):
             raise GameError("Bạn không ở trong ván.")
         if not self.in_progress():
             raise GameError("Ván chưa bắt đầu.")
+        other_humans = [
+            m for m in self._seated_marks()
+            if m != player.mark and (p := self.seat(m)) is not None and not p.bot
+        ]
+        if other_humans:
+            # Z2: Nếu còn đồng đội người thật khác đang chơi, chỉ rút người này ra thay vì kết thúc cả phòng
+            mark = player.mark
+            self.survivors.pop(mark, None)
+            self.system(f"{player.name} rút lui khỏi chiến trường.")
+            if not self.survivors:
+                self._finish_match(victory=False)
+            else:
+                self.touched = time.time()
+            return
         self._finish_match(victory=False)
 
     def vote_rematch(self, uid: str) -> None:
@@ -2243,9 +2377,9 @@ class ZombieRoom(SeatedRoom):
 
         if action == "input":
             if sv["alive"] and not sv["downed"]:
-                sv["vx"] = _clamp(float(msg.get("vx", 0.0)), -1.0, 1.0)
-                sv["vy"] = _clamp(float(msg.get("vy", 0.0)), -1.0, 1.0)
-                sv["aim"] = float(msg.get("aim", sv["aim"]))
+                sv["vx"] = _clamp(_finite_float(msg.get("vx", 0.0), 0.0), -1.0, 1.0)
+                sv["vy"] = _clamp(_finite_float(msg.get("vy", 0.0), 0.0), -1.0, 1.0)
+                sv["aim"] = _finite_float(msg.get("aim", sv["aim"]), sv["aim"]) % math.tau
                 sv["firing"] = bool(msg.get("firing", False))
                 if sv["firing"] and self.phase == "wave":
                     self._fire_weapon(sv, now)
@@ -2254,7 +2388,7 @@ class ZombieRoom(SeatedRoom):
         if action == "shoot":
             if self.phase == "wave" and sv["alive"] and not sv["downed"]:
                 if "aim" in msg:
-                    sv["aim"] = float(msg["aim"])
+                    sv["aim"] = _finite_float(msg["aim"], sv["aim"]) % math.tau
                 self._fire_weapon(sv, now)
             return
 
@@ -2277,8 +2411,8 @@ class ZombieRoom(SeatedRoom):
 
         if action == "grenade":
             if self.phase == "wave":
-                tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
-                ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
+                tx = _clamp(_finite_float(msg.get("tx"), sv["x"] + math.cos(sv["aim"]) * 220.0), 0.0, ARENA_W)
+                ty = _clamp(_finite_float(msg.get("ty"), sv["y"] + math.sin(sv["aim"]) * 220.0), 0.0, ARENA_H)
                 gkind = str(msg.get("kind", "grenade")).strip()
                 if gkind not in ("grenade", "cryo", "emp"):
                     gkind = "grenade"
@@ -2287,15 +2421,15 @@ class ZombieRoom(SeatedRoom):
 
         if action == "cryo":
             if self.phase == "wave":
-                tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
-                ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
+                tx = _clamp(_finite_float(msg.get("tx"), sv["x"] + math.cos(sv["aim"]) * 220.0), 0.0, ARENA_W)
+                ty = _clamp(_finite_float(msg.get("ty"), sv["y"] + math.sin(sv["aim"]) * 220.0), 0.0, ARENA_H)
                 self._throw_grenade(sv, tx, ty, kind="cryo")
             return
 
         if action == "emp":
             if self.phase == "wave":
-                tx = float(msg.get("tx", sv["x"] + math.cos(sv["aim"]) * 220.0))
-                ty = float(msg.get("ty", sv["y"] + math.sin(sv["aim"]) * 220.0))
+                tx = _clamp(_finite_float(msg.get("tx"), sv["x"] + math.cos(sv["aim"]) * 220.0), 0.0, ARENA_W)
+                ty = _clamp(_finite_float(msg.get("ty"), sv["y"] + math.sin(sv["aim"]) * 220.0), 0.0, ARENA_H)
                 self._throw_grenade(sv, tx, ty, kind="emp")
             return
 
@@ -2388,7 +2522,7 @@ class ZombieRoom(SeatedRoom):
                 "readyShop": sv["readyShop"],
             })
 
-        return {
+        out = {
             "matchId": self.match_id,
             "phase": self.phase,
             "config": dict(self.config),
@@ -2478,30 +2612,91 @@ class ZombieRoom(SeatedRoom):
                 for pk in self.pickups
             ],
             "events": self.events[-100:],
-            "catalog": {
-                "classes": {k: {"label": v["label"], "hp": v["hp"], "armor": v["armor"], "speed": v["speed"]} for k, v in CLASSES.items()},
-                "weapons": {
-                    k: {
-                        "name": v["name"],
-                        "cost": v["cost"],
-                        "dmg": v["dmg"],
-                        "rate": v["rate"],
-                        "mag": v["mag"],
-                        "pellets": v["pellets"],
-                        "range": v["range"],
-                        "pierce": v["pierce"],
-                        "splash": v.get("splash", 0.0),
-                        "burn": v.get("burn", 0.0),
-                        "chain": v.get("chain", 0),
-                        "color": v["color"],
-                    }
-                    for k, v in WEAPONS.items()
-                },
-                "weaponOrder": list(WEAPON_ORDER),
-                "maxWeaponLv": MAX_WEAPON_LV,
-                "perks": PERKS,
-                "items": SHOP_ITEMS,
-            },
+            "catalog": _ZOMBIE_CATALOG,
             "seatedCount": len(self._seated_marks()),
             "maxSeats": len(self.SEATS),
         }
+        return out
+
+    def you_view(self, uid: str) -> dict:
+        player = self.players.get(uid)
+        return {
+            "uid": uid,
+            "mark": player.mark if player else "",
+            "name": player.name if player else "",
+        }
+
+    def shared_view(self, *, full: bool = True) -> dict:
+        """Build state dùng chung 1 lần mỗi tick cho cả phòng (hỗ trợ delta frame 15 Hz)."""
+        static_ver = (
+            self.match_id,
+            self.mode,
+            self.phase,
+            self.status,
+            len(self.chat),
+            tuple(
+                (m, p.uid, p.name, p.connected, p.bot)
+                for m in self.SEATS
+                if (p := self.seat(m)) is not None
+            ),
+        )
+        include_static = full or (static_ver != self._last_static_ver)
+        self._last_static_ver = static_ver
+
+        base: dict = {
+            "code": self.code,
+            "mode": self.mode,
+            "label": self.label,
+            "status": self.status,
+            "winner": self.winner,
+            "scores": self.scores,
+            "spectators": [{"name": p.name, "color": p.color}
+                           for p in self.players.values() if not p.mark and p.connected],
+            "rematch": sorted(self.rematch),
+        }
+        if include_static:
+            base["seatOrder"] = list(self.SEATS)
+            base["seats"] = {m: self._seat_info(m) for m in self.SEATS}
+            base["seatLabels"] = {m: self._seat_label(m) for m in self.SEATS}
+            base["chat"] = self.chat[-40:]
+
+        mv = self.match_view("")
+        if not include_static:
+            mv.pop("catalog", None)
+            mv.pop("arena", None)
+        if full:
+            mv["events"] = self.events[-30:]
+        else:
+            last_seq = self._last_broadcast_event_seq
+            mv["events"] = [e for e in self.events if e["seq"] > last_seq]
+        if self.events:
+            self._last_broadcast_event_seq = max(self._last_broadcast_event_seq, self.events[-1]["seq"])
+
+        base.update(mv)
+        return base
+
+
+_ZOMBIE_CATALOG = {
+    "classes": {k: {"label": v["label"], "hp": v["hp"], "armor": v["armor"], "speed": v["speed"]} for k, v in CLASSES.items()},
+    "weapons": {
+        k: {
+            "name": v["name"],
+            "cost": v["cost"],
+            "dmg": v["dmg"],
+            "rate": v["rate"],
+            "mag": v["mag"],
+            "pellets": v["pellets"],
+            "range": v["range"],
+            "pierce": v["pierce"],
+            "splash": v.get("splash", 0.0),
+            "burn": v.get("burn", 0.0),
+            "chain": v.get("chain", 0),
+            "color": v["color"],
+        }
+        for k, v in WEAPONS.items()
+    },
+    "weaponOrder": list(WEAPON_ORDER),
+    "maxWeaponLv": MAX_WEAPON_LV,
+    "perks": PERKS,
+    "items": SHOP_ITEMS,
+}
