@@ -62,7 +62,7 @@ MODE_ISO_COUNTRIES: dict[str, set[str]] = {
         "CH", "AT", "DK", "NO", "SE", "FI", "IS", "PL", "CZ", "SK", "HU",
         "RO", "BG", "GR", "HR", "SI", "RS", "BA", "ME", "MK", "AL", "LT",
         "LV", "EE", "UA", "BY", "MD", "AD", "MC", "SM", "MT", "CY", "FO",
-        "LI", "VA",
+        "LI", "VA", "RU",
     },
     "north_america": {
         "US", "CA", "MX", "GT", "BZ", "HN", "SV", "NI", "CR", "PA", "DO",
@@ -203,6 +203,8 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         (23.5, 26.2, 50.8, 56.4),     # UAE & Qatar & Oman
         (29.5, 33.4, 34.4, 36.8),     # Jordan & Israel
         (36.2, 41.8, 27.0, 44.5),     # Thổ Nhĩ Kỳ
+        (52.0, 57.0, 60.0, 86.5),     # Tây & Trung Siberia (Nga)
+        (51.5, 56.5, 92.0, 108.0),    # Đông Siberia & Hồ Baikal (Nga)
     ],
     "europe": [
         (50.0, 58.6, -6.2, 1.8),      # Anh & Scotland
@@ -223,6 +225,8 @@ STREETVIEW_LAND_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
         (41.5, 46.6, 13.6, 22.8),     # Croatia, Slovenia, Serbia, Balkan
         (54.0, 59.5, 21.0, 28.0),     # Baltic (Litva, Latvia, Estonia)
         (46.0, 51.8, 23.0, 36.5),     # Ukraine
+        (54.5, 60.2, 29.8, 44.5),     # Tây Nga (Moscow, St. Petersburg, Nizhny Novgorod)
+        (51.0, 56.5, 45.0, 56.5),     # Vùng Volga & Tây Ural (Kazan, Samara, Ufa)
     ],
     "north_america": [
         (32.5, 42.0, -124.2, -114.5), # California & Bờ Tây Mỹ
@@ -347,11 +351,131 @@ STREETVIEW_BOX_META: dict[tuple[float, float, float, float], tuple[str, int, flo
     (-12.20, -12.11, 96.81, 96.91): ("CC", 8000, 2.4),
 }
 _MICRO_ISLAND_CCS = frozenset({"GU", "MP", "AS", "HI", "VU", "PN", "UM", "CX", "CC"})
+_NA_HAWAII_BOX = (19.2, 22.2, -160.0, -155.0)
+
+# Trọng số nội bộ theo quy mô lãnh thổ & mật độ phủ Street View cho các châu lục
+# (dùng chung khi chơi riêng từng châu lục và khi phân bổ ngân sách trong bản đồ Toàn cầu).
+_CONTINENT_BOX_WEIGHTS: dict[tuple[float, float, float, float], float] = {
+    # Châu Á (23 khung)
+    (10.0, 21.8, 105.0, 109.2): 1.1,    # Việt Nam
+    (1.2, 7.2, 100.0, 104.2): 1.2,      # Malaysia & Singapore
+    (7.5, 20.0, 98.2, 105.4): 1.3,      # Thái Lan
+    (11.0, 14.0, 103.0, 106.8): 0.8,    # Campuchia
+    (17.5, 20.5, 101.8, 103.0): 0.5,    # Lào
+    (-8.6, 5.5, 95.5, 119.5): 1.4,      # Indonesia
+    (6.5, 18.5, 120.0, 126.2): 1.2,     # Philippines
+    (22.0, 25.2, 120.1, 121.9): 1.1,    # Đài Loan
+    (22.15, 22.5, 113.85, 114.35): 0.4, # Hồng Kông & Macau
+    (31.0, 45.2, 129.5, 145.5): 1.5,    # Nhật Bản
+    (34.5, 38.2, 126.3, 129.4): 1.2,    # Hàn Quốc
+    (8.2, 32.5, 70.0, 91.5): 1.4,       # Ấn Độ
+    (6.0, 9.8, 79.6, 81.8): 0.7,        # Sri Lanka
+    (21.5, 26.2, 88.2, 92.2): 0.8,      # Bangladesh
+    (26.8, 28.4, 83.5, 87.5): 0.5,      # Nepal & Bhutan
+    (41.5, 51.5, 52.0, 82.0): 0.9,      # Kazakhstan
+    (39.8, 43.0, 70.0, 78.5): 0.6,      # Kyrgyzstan
+    (46.0, 50.0, 95.0, 115.0): 0.7,     # Mông Cổ
+    (23.5, 26.2, 50.8, 56.4): 0.8,      # UAE & Qatar & Oman
+    (29.5, 33.4, 34.4, 36.8): 0.8,      # Jordan & Israel
+    (36.2, 41.8, 27.0, 44.5): 1.2,      # Thổ Nhĩ Kỳ
+    (52.0, 57.0, 60.0, 86.5): 1.0,      # Tây & Trung Siberia (Nga)
+    (51.5, 56.5, 92.0, 108.0): 0.8,     # Đông Siberia & Hồ Baikal (Nga)
+    # Châu Âu (20 khung)
+    (50.0, 58.6, -6.2, 1.8): 1.2,       # Anh & Scotland
+    (51.4, 55.2, -10.2, -6.0): 0.7,     # Ireland
+    (42.5, 50.9, -4.5, 7.8): 1.5,       # Pháp & Bỉ & Hà Lan & Luxembourg
+    (36.1, 43.6, -9.4, 3.2): 1.4,       # Tây Ban Nha & Bồ Đào Nha
+    (37.5, 46.5, 7.0, 18.2): 1.3,       # Ý
+    (47.3, 54.8, 6.0, 14.8): 1.3,       # Đức
+    (45.8, 48.9, 6.0, 17.0): 1.0,       # Thụy Sĩ & Áo
+    (54.6, 57.7, 8.1, 12.6): 0.7,       # Đan Mạch
+    (58.0, 70.5, 5.0, 29.0): 1.2,       # Na Uy & Thụy Điển
+    (60.0, 68.5, 21.0, 30.8): 1.0,      # Phần Lan
+    (63.4, 66.2, -24.0, -14.0): 0.4,    # Iceland
+    (49.0, 54.6, 14.2, 23.8): 1.1,      # Ba Lan
+    (47.5, 51.0, 12.2, 22.4): 1.1,      # Séc, Slovakia, Hungary
+    (43.8, 48.2, 20.5, 29.5): 1.1,      # Romania & Bulgaria
+    (36.5, 41.6, 20.0, 26.5): 1.0,      # Hy Lạp
+    (41.5, 46.6, 13.6, 22.8): 1.2,      # Croatia, Slovenia, Serbia, Balkan
+    (54.0, 59.5, 21.0, 28.0): 0.9,      # Baltic
+    (46.0, 51.8, 23.0, 36.5): 0.9,      # Ukraine
+    (54.5, 60.2, 29.8, 44.5): 1.2,      # Tây Nga (Moscow, St. Petersburg)
+    (51.0, 56.5, 45.0, 56.5): 0.9,      # Vùng Volga & Tây Ural (Nga)
+    # Bắc Mỹ (14 khung)
+    (32.5, 42.0, -124.2, -114.5): 1.3,  # California & Bờ Tây Mỹ
+    (42.0, 48.8, -124.3, -116.5): 1.0,  # Oregon & Washington
+    (31.5, 48.5, -114.0, -96.0): 1.2,   # Miền Núi & Trung Tây Mỹ
+    (26.0, 36.5, -106.0, -88.0): 1.2,   # Texas & Miền Nam Mỹ
+    (25.2, 36.5, -88.0, -75.5): 1.2,    # Florida & Đông Nam Mỹ
+    (36.5, 47.0, -88.0, -67.2): 1.3,    # Ngũ Hồ, New York & New England
+    (58.0, 65.0, -152.0, -142.0): 0.5,  # Alaska
+    (19.2, 22.2, -160.0, -155.0): 0.5,  # Hawaii (chỉ dùng trong mode north_america)
+    (43.5, 53.5, -125.0, -110.0): 1.2,  # Tây Canada
+    (43.0, 50.5, -84.0, -60.5): 1.2,    # Đông Canada
+    (16.0, 32.2, -116.5, -87.0): 1.5,   # Mexico
+    (14.0, 16.5, -92.0, -89.0): 0.5,    # Guatemala
+    (8.4, 11.2, -85.8, -79.2): 0.8,     # Costa Rica & Panama
+    (17.8, 19.9, -71.8, -65.5): 0.6,    # Cộng hòa Dominican & Puerto Rico
+    # Nam Mỹ (8 khung)
+    (-24.0, -1.0, -52.0, -35.0): 1.5,   # Brazil (Đông Bắc, Rio, São Paulo, Minas)
+    (-33.5, -23.0, -56.5, -48.0): 1.2,  # Nam Brazil & Uruguay
+    (-39.0, -22.0, -68.5, -57.5): 1.3,  # Argentina (Bắc & Pampas)
+    (-54.8, -39.0, -73.5, -65.0): 0.8,  # Patagonia
+    (-39.0, -18.5, -73.2, -68.5): 1.0,  # Miền Trung & Bắc Chile
+    (-18.0, -0.5, -81.0, -69.5): 1.1,   # Peru & Ecuador
+    (-22.0, -11.0, -69.0, -58.0): 0.6,  # Bolivia
+    (0.5, 11.2, -77.5, -72.0): 1.1,     # Colombia
+    # Châu Phi (8 khung)
+    (-34.6, -23.5, 18.0, 32.0): 1.5,    # Nam Phi
+    (-26.5, -18.0, 22.0, 27.5): 0.9,    # Botswana & Eswatini & Lesotho
+    (-24.5, -17.5, 14.0, 21.0): 0.8,    # Namibia
+    (-7.5, 4.2, 33.8, 41.2): 1.3,       # Kenya & Tanzania & Uganda & Rwanda
+    (12.2, 16.2, -17.5, -11.5): 0.8,    # Senegal
+    (5.0, 11.0, -3.0, 12.0): 1.1,       # Ghana & Nigeria
+    (29.5, 37.1, -9.5, 11.2): 1.1,      # Morocco & Tunisia
+    (25.0, 31.2, 29.8, 33.0): 0.6,      # Ai Cập
+}
+
+# Ngân sách % cố định cho 6 châu lục trong chế độ Toàn cầu (tổng = 100.0%)
+WORLD_CONTINENT_BUDGETS: dict[str, float] = {
+    "europe": 30.0,
+    "asia": 22.0,
+    "north_america": 16.0,
+    "south_america": 14.0,
+    "africa": 10.0,
+    "oceania": 8.0,
+}
+
 STREETVIEW_LAND_BOXES["world"] = [
     box
-    for k in ("europe", "north_america", "south_america", "asia", "africa", "oceania")
+    for k in WORLD_CONTINENT_BUDGETS
     for box in STREETVIEW_LAND_BOXES[k]
+    if not (k == "north_america" and box == _NA_HAWAII_BOX)
 ]
+
+
+def _build_world_box_weights() -> dict[tuple[float, float, float, float], float]:
+    """Quy đổi ngân sách 6 châu lục thành trọng số cụ thể cho từng khung trong bản đồ Toàn cầu."""
+    out: dict[tuple[float, float, float, float], float] = {}
+    for cont, budget in WORLD_CONTINENT_BUDGETS.items():
+        cont_boxes = [
+            b for b in STREETVIEW_LAND_BOXES[cont]
+            if not (cont == "north_america" and b == _NA_HAWAII_BOX)
+        ]
+        if cont == "oceania":
+            raw_weights = [
+                STREETVIEW_BOX_META[b][2] * (0.35 if STREETVIEW_BOX_META[b][0] in _MICRO_ISLAND_CCS else 1.0)
+                for b in cont_boxes
+            ]
+        else:
+            raw_weights = [_CONTINENT_BOX_WEIGHTS.get(b, 1.0) for b in cont_boxes]
+        total_raw = sum(raw_weights) or 1.0
+        for b, rw in zip(cont_boxes, raw_weights):
+            out[b] = budget * (rw / total_raw)
+    return out
+
+
+_WORLD_BOX_WEIGHTS: dict[tuple[float, float, float, float], float] = _build_world_box_weights()
 
 REGION_ALIASES: dict[str, str] = {
     "seoul": "Hàn Quốc", "bangkok": "Thái Lan", "dubai": "UAE", "tây tạng": "Trung Quốc",
@@ -401,6 +525,7 @@ COUNTRY_GEO_INFO: dict[str, tuple[str, str]] = {
     "Samoa": ("Quốc gia Độc lập", "Polynesia · Nam Thái Bình Dương"),
     "Tonga": ("Quốc gia Độc lập", "Polynesia · Nam Thái Bình Dương"),
     "Việt Nam": ("Quốc gia Độc lập", "Đông Nam Á"),
+    "Nga": ("Quốc gia Độc lập", "Đông Âu & Bắc Á"),
 }
 
 # Danh mục địa danh / đảo / thị trấn chi tiết để bổ sung Metadata cho tọa độ thiếu tên đường:
@@ -907,37 +1032,89 @@ def enrich_location_metadata(loc: dict, mode: str = "world") -> dict:
     return {**loc, "name": display_name, "country": country, "meta": meta}
 
 
+def _vn_box_token(lat: float, lng: float) -> str:
+    """Ánh xạ tọa độ Việt Nam về chỉ số khung tỉnh/thành gần nhất để chống lặp liên tiếp."""
+    vn_boxes = STREETVIEW_LAND_BOXES["vietnam"]
+    best_idx = 0
+    best_d2 = float("inf")
+    for idx, (lat_min, lat_max, lng_min, lng_max) in enumerate(vn_boxes):
+        c_lat = (lat_min + lat_max) * 0.5
+        c_lng = (lng_min + lng_max) * 0.5
+        d2 = (lat - c_lat) ** 2 + (lng - c_lng) ** 2
+        if d2 < best_d2:
+            best_d2 = d2
+            best_idx = idx
+    return f"VN:{best_idx}"
+
+
+def _location_region_token(loc: dict, mode: str) -> str:
+    """Trả mã định danh vùng dùng cho chống lặp vòng liên tiếp (tỉnh với VN, ISO-2 với quốc tế)."""
+    if mode == "vietnam":
+        try:
+            return _vn_box_token(float(loc["lat"]), float(loc["lng"]))
+        except (KeyError, TypeError, ValueError):
+            return ""
+    cc = str(loc.get("cc") or "").strip().upper()
+    if not cc:
+        c_low = str(loc.get("country") or "").strip().lower()
+        for k, v in REGION_ALIASES.items():
+            if len(k) == 2 and v.lower() == c_low:
+                cc = k.upper()
+                break
+    return cc
+
+
+def _box_weight_for_mode(
+    mode: str,
+    box: tuple[float, float, float, float],
+    idx: int = 0,
+    recent_set: set[str] | None = None,
+) -> float:
+    """Trọng số bốc khung chuẩn dùng chung cho cả Server (_pick_land_box) và Browser Feed."""
+    meta = STREETVIEW_BOX_META.get(box)
+    cc = meta[0] if meta else ""
+    if mode == "oceania":
+        w = meta[2] if meta else 1.0
+        if recent_set and cc in _MICRO_ISLAND_CCS and cc in recent_set:
+            w = max(0.2, w * 0.35)
+        return w
+    if mode == "world":
+        w = _WORLD_BOX_WEIGHTS.get(box, 1.0)
+        if recent_set and cc and cc in recent_set:
+            w *= 0.35
+        return w
+    if mode == "vietnam":
+        w = 1.0
+        if recent_set and f"VN:{idx}" in recent_set:
+            w *= 0.35
+        return w
+    w = _CONTINENT_BOX_WEIGHTS.get(box, 1.0)
+    if recent_set and cc and cc in recent_set:
+        w *= 0.35
+    return w
+
+
 def _pick_land_box(
     mode: str,
     recent_regions: list[str] | tuple[str, ...] | None = None,
 ) -> tuple[tuple[float, float, float, float], str, int]:
     """Chọn một khung tọa độ theo trọng số tự nhiên.
 
-    Với ``oceania``: Úc + New Zealand ~60%, các quốc đảo & lãnh thổ ~40%.
-    Nếu một đảo nhỏ vừa xuất hiện trong 3 vòng gần nhất (``recent_regions``),
-    giảm nhẹ trọng số của đảo đó (×0.35 — Soft Cooldown) để vẫn giữ tính random
-    tự nhiên mà tránh lặp liên tiếp cùng một đảo nhỏ.
+    - ``world``: phân bổ theo ngân sách 6 châu lục (Châu Âu 30%, Châu Á 22%, Bắc Mỹ 16%,
+      Nam Mỹ 14%, Châu Phi 10%, Châu Đại Dương 8%) kết hợp trọng số từng khung bên trong.
+    - ``oceania``: Úc + New Zealand ~60%, các quốc đảo & lãnh thổ ~40%.
+    - Các châu lục khác: dùng trọng số nội bộ ``_CONTINENT_BOX_WEIGHTS`` theo quy mô vùng.
+    - ``vietnam``: 64 khung tỉnh/thành đều nhau kèm Soft Cooldown chống lặp tỉnh gần nhất.
     """
-    boxes = STREETVIEW_LAND_BOXES.get(mode) or STREETVIEW_LAND_BOXES["world"]
-    default_radius = 18000 if mode == "vietnam" else 45000
+    eff_mode = mode if mode in STREETVIEW_LAND_BOXES else "world"
+    boxes = STREETVIEW_LAND_BOXES[eff_mode]
+    default_radius = 18000 if eff_mode == "vietnam" else 45000
     recent_set = {r.upper() for r in (recent_regions or ())[-3:]}
-    if mode == "oceania":
-        weights = []
-        for b in boxes:
-            cc, _, w = STREETVIEW_BOX_META.get(b, ("", default_radius, 1.0))
-            if cc in _MICRO_ISLAND_CCS and cc in recent_set:
-                w = max(0.2, w * 0.35)
-            weights.append(w)
-        box = random.choices(boxes, weights=weights, k=1)[0]
-    elif mode == "world":
-        # Tránh các khung đảo nhỏ của oceania chiếm tỷ trọng quá lớn trong bản đồ thế giới
-        weights = [
-            0.2 if (b in STREETVIEW_BOX_META and STREETVIEW_BOX_META[b][0] in _MICRO_ISLAND_CCS) else 1.0
-            for b in boxes
-        ]
-        box = random.choices(boxes, weights=weights, k=1)[0]
-    else:
-        box = random.choice(boxes)
+    weights = [
+        _box_weight_for_mode(eff_mode, b, idx=i, recent_set=recent_set)
+        for i, b in enumerate(boxes)
+    ]
+    box = random.choices(boxes, weights=weights, k=1)[0]
     meta = STREETVIEW_BOX_META.get(box)
     if meta:
         return box, meta[0], meta[1]
@@ -1208,16 +1385,10 @@ def sv_client_config() -> dict:
         boxes = STREETVIEW_LAND_BOXES.get(m) or STREETVIEW_LAND_BOXES["world"]
         default_radius = 18000 if m == "vietnam" else 45000
         box_rows: list[list] = []
-        for b in boxes:
+        for i, b in enumerate(boxes):
             meta = STREETVIEW_BOX_META.get(b)
-            cc = meta[0] if meta else ""
             radius = meta[1] if meta else default_radius
-            if m == "oceania":
-                weight = meta[2] if meta else 1.0
-            elif m == "world":
-                weight = 0.2 if cc in _MICRO_ISLAND_CCS else 1.0
-            else:
-                weight = 1.0
+            weight = round(_box_weight_for_mode(m, b, idx=i), 4)
             box_rows.append([b[0], b[1], b[2], b[3], int(radius), float(weight)])
         modes_out[m] = {"boxes": box_rows}
     return {"rpcUrl": _SV_RPC_URL, "modes": modes_out}
@@ -1560,15 +1731,9 @@ class GeoRoom(SeatedRoom):
         return 0 if self._available_dynamic_cache_count() >= 1 else 1
 
     def _record_recent_region(self, loc: dict) -> None:
-        cc = str(loc.get("cc") or "").strip().upper()
-        if not cc:
-            c_low = str(loc.get("country") or "").strip().lower()
-            for k, v in REGION_ALIASES.items():
-                if len(k) == 2 and v.lower() == c_low:
-                    cc = k.upper()
-                    break
-        if cc:
-            self.session_recent_regions.append(cc)
+        token = _location_region_token(loc, self.mode)
+        if token:
+            self.session_recent_regions.append(token)
             if len(self.session_recent_regions) > 8:
                 del self.session_recent_regions[:-8]
 
@@ -1596,7 +1761,8 @@ class GeoRoom(SeatedRoom):
     def _draw_location(self, used_coords: set[tuple[float, float]], allow_live_fetch: bool = True) -> dict:
         if self._is_global_dynamic():
             picked: dict | None = None
-            recent_micro = {r for r in self.session_recent_regions[-3:] if r in _MICRO_ISLAND_CCS}
+            recent_tokens = set(self.session_recent_regions[-2:])
+            recent_micro = {r for r in self.session_recent_regions[-4:] if r in _MICRO_ISLAND_CCS}
             room_humans = {p.uid for p in self.players.values() if not p.bot and p.mark}
             with _DYNAMIC_SV_LOCK:
                 cache = _DYNAMIC_SV_CACHE.get(self.mode, [])
@@ -1606,8 +1772,8 @@ class GeoRoom(SeatedRoom):
                     key = (cand["lat"], cand["lng"])
                     if key in used_coords or key in self.session_seen_coords:
                         continue
-                    cc = str(cand.get("cc") or "").upper()
-                    if cc in recent_micro:
+                    token = _location_region_token(cand, self.mode)
+                    if token and (token in recent_tokens or token in recent_micro):
                         if fallback_idx is None:
                             fallback_idx = i
                         continue
