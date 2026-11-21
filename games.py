@@ -16,6 +16,7 @@ test được độc lập.
 
 from __future__ import annotations
 
+import math
 import random
 import time
 from dataclasses import dataclass, field
@@ -70,6 +71,26 @@ def clean_text(raw: str, limit: int = CHAT_MAX) -> str:
 
 def other_mark(mark: str) -> str:
     return "O" if mark == "X" else "X"
+
+
+def int_field(msg: dict, key: str, default: int = 0) -> int:
+    """Đọc số nguyên an toàn từ gói tin client; chặn Infinity/NaN gây OverflowError."""
+    raw = msg.get(key, default)
+    if isinstance(raw, bool):
+        return default
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        if not math.isfinite(raw):
+            return default
+        return int(raw)
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(val):
+        return default
+    return int(val)
 
 
 @dataclass
