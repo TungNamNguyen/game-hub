@@ -112,6 +112,151 @@ function loadLeaflet() {
   return leafletPromise;
 }
 
+let svConfigPromise = null;
+function loadSvConfig() {
+  if (!svConfigPromise) {
+    svConfigPromise = fetch('/api/geo/sv-config', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((cfg) => {
+        if (!cfg || !cfg.rpcUrl || !cfg.modes) {
+          svConfigPromise = null;
+          return null;
+        }
+        return cfg;
+      });
+  }
+  return svConfigPromise;
+}
+
+function isValidSvResolution(node) {
+  if (!Array.isArray(node) || node.length < 3 || !Array.isArray(node[2])) return false;
+  const dims = Array.isArray(node[2][2]) ? node[2][2] : [];
+  if (dims.length < 2) return false;
+  const hPx = Number(dims[0]);
+  const wPx = Number(dims[1]);
+  if (!Number.isFinite(hPx) || !Number.isFinite(wPx) || hPx < 3328 || wPx < 6656) return false;
+  if (node[2].length > 3 && Array.isArray(node[2][3]) && Array.isArray(node[2][3][0])) {
+    if (node[2][3][0].length < 5) return false;
+  }
+  return true;
+}
+
+function parseSvResponse(data) {
+  try {
+    const node = data?.[1];
+    if (!Array.isArray(node)) return null;
+    if (!Array.isArray(node[1]) || node[1][0] !== 2) return null;
+    if (!isValidSvResolution(node)) return null;
+    const locBlock = node[5]?.[0]?.[1];
+    if (!Array.isArray(locBlock)) return null;
+    if (locBlock.length > 3 && locBlock[3] != null) return null;
+    const coords = locBlock[0];
+    const snapLat = Number(coords?.[2]);
+    const snapLng = Number(coords?.[3]);
+    if (!Number.isFinite(snapLat) || !Number.isFinite(snapLng)) return null;
+    if (snapLat < -85 || snapLat > 85 || snapLng < -180 || snapLng > 180) return null;
+    let heading = 0;
+    if (Array.isArray(locBlock[2]) && locBlock[2].length) {
+      const hVal = Number(locBlock[2][0]);
+      if (Number.isFinite(hVal)) heading = ((Math.round(hVal) % 360) + 360) % 360;
+    }
+    const countryCode = typeof locBlock[4] === 'string' ? locBlock[4].trim() : '';
+    let address = '';
+    if (Array.isArray(node[3]?.[2])) {
+      address = node[3][2]
+        .filter((p) => Array.isArray(p) && typeof p[0] === 'string')
+        .map((p) => p[0])
+        .join(', ');
+    }
+    const pano = typeof node[1][1] === 'string' ? node[1][1] : '';
+    if (pano.length !== 22 || pano.startsWith('CAoS')) return null;
+    return {
+      lat: Math.round(snapLat * 1e5) / 1e5,
+      lng: Math.round(snapLng * 1e5) / 1e5,
+      heading,
+      pano,
+      address,
+      country_code: countryCode,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function probeSvInBrowser(rpcUrl, lat, lng, radius) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const body = JSON.stringify([
+      ['apiv3'],
+      [[null, null, Math.round(lat * 1e6) / 1e6, Math.round(lng * 1e6) / 1e6], Math.round(radius)],
+      [null, ['vi', 'VN'], null, null, null, null, null, null, [2], null, [[[2, true, 2]]]],
+      [[1, 2, 3, 4, 8, 6]],
+    ]);
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json+protobuf' },
+      body,
+      credentials: 'omit',
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { ok: false, netErr: true, item: null };
+    const data = await res.json();
+    return { ok: true, netErr: false, item: parseSvResponse(data) };
+  } catch {
+    return { ok: false, netErr: true, item: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function pickWeightedBox(boxes) {
+  let total = 0;
+  for (const b of boxes) total += Math.max(0.01, Number(b[5]) || 1);
+  let r = Math.random() * total;
+  for (const b of boxes) {
+    r -= Math.max(0.01, Number(b[5]) || 1);
+    if (r <= 0) return b;
+  }
+  return boxes[boxes.length - 1];
+}
+
+async function collectSvInBrowser(mode, need, isCancelled) {
+  const cfg = await loadSvConfig();
+  const boxes = cfg?.modes?.[mode]?.boxes;
+  if (!cfg || !Array.isArray(boxes) || !boxes.length) return [];
+  const target = Math.max(1, Math.min(12, Number(need) || 6));
+  const maxAttempts = target * 6;
+  const collected = [];
+  const seenPanos = new Set();
+  let attempts = 0;
+  let consecutiveNetErrs = 0;
+
+  const worker = async () => {
+    while (!isCancelled() && collected.length < target && attempts < maxAttempts && consecutiveNetErrs < 3) {
+      attempts += 1;
+      const box = pickWeightedBox(boxes);
+      const lat = box[0] + Math.random() * (box[1] - box[0]);
+      const lng = box[2] + Math.random() * (box[3] - box[2]);
+      const radius = box[4] || 45000;
+      const res = await probeSvInBrowser(cfg.rpcUrl, lat, lng, radius);
+      if (res.netErr) {
+        consecutiveNetErrs += 1;
+        continue;
+      }
+      consecutiveNetErrs = 0;
+      if (res.item && !seenPanos.has(res.item.pano)) {
+        seenPanos.add(res.item.pano);
+        collected.push(res.item);
+      }
+    }
+  };
+
+  await Promise.all([worker(), worker(), worker()]);
+  return collected;
+}
+
 function defaultCenterForMode(mode) {
   switch (mode) {
     case 'vietnam': return { lat: 16.05, lng: 106.5, zoom: 5 };
@@ -253,6 +398,31 @@ export default {
 
     const send = (action, extra = {}) => {
       net.send(CHANNEL, action, extra);
+    };
+
+    let disposed = false;
+    let svFeedRunning = false;
+    let svFeedBackoffUntil = 0;
+
+    const maybeFeedStreetView = (req) => {
+      if (disposed || !req || !req.mode || !req.need || svFeedRunning) return;
+      if (Date.now() < svFeedBackoffUntil) return;
+      svFeedRunning = true;
+      collectSvInBrowser(req.mode, req.need, () => disposed)
+        .then((items) => {
+          if (disposed) return;
+          if (items.length > 0) {
+            send('sv_feed', { mode: req.mode, items });
+          } else {
+            svFeedBackoffUntil = Date.now() + 60000;
+          }
+        })
+        .catch(() => {
+          svFeedBackoffUntil = Date.now() + 60000;
+        })
+        .finally(() => {
+          svFeedRunning = false;
+        });
     };
 
     const sendDraftThrottled = (pin) => {
@@ -461,9 +631,13 @@ export default {
 
     const resetStreetView = () => {
       if (!state || !state.streetView) return;
-      const { lat, lng, heading } = state.streetView;
+      const { lat, lng, heading, pano } = state.streetView;
       if (svPanorama && !gmapsJsBroken && svJsPane.style.display !== 'none') {
-        svPanorama.setPosition({ lat, lng });
+        if (pano) {
+          svPanorama.setPano(pano);
+        } else if (lat != null && lng != null) {
+          svPanorama.setPosition({ lat, lng });
+        }
         svPanorama.setPov({ heading: heading || 0, pitch: 0 });
         svPanorama.setZoom(0);
         return;
@@ -483,8 +657,10 @@ export default {
       svJsPane.replaceChildren();
       svJsPane.style.display = 'none';
       svIframe.style.display = '';
-      const panoPart = pano ? `&pano=${encodeURIComponent(pano)}` : '';
-      const nextUrl = `https://www.google.com/maps/embed/v1/streetview?location=${lat},${lng}${panoPart}&fov=100&heading=${heading || 0}&pitch=0&key=${SV_EMBED_KEY}`;
+      const locParams = [];
+      if (lat != null && lng != null) locParams.push(`location=${lat},${lng}`);
+      if (pano) locParams.push(`pano=${encodeURIComponent(pano)}`);
+      const nextUrl = `https://www.google.com/maps/embed/v1/streetview?${locParams.join('&')}&fov=100&heading=${heading || 0}&pitch=0&key=${SV_EMBED_KEY}`;
       if (nextUrl !== lastSvUrl) {
         lastSvUrl = nextUrl;
         svLoader.classList.remove('hidden');
@@ -509,7 +685,7 @@ export default {
       const isNMPZ = state.moveRule === 'NMPZ';
       const isNM = state.moveRule === 'NM';
       const { lat, lng, heading, pano } = state.streetView;
-      const svKey = `${lat},${lng},${heading || 0},${pano || ''}:${state.moveRule || 'MOVING'}`;
+      const svKey = `${lat ?? ''},${lng ?? ''},${heading || 0},${pano || ''}:${state.moveRule || 'MOVING'}`;
 
       if (svKey !== lastSvKey) {
         lastSvKey = svKey;
@@ -1331,6 +1507,7 @@ export default {
           send('start');
         }
         renderState();
+        maybeFeedStreetView(state.svFeed);
       } else if (msg.t === 'error') {
         nextPending = false;
         renderGuessBar();
@@ -1346,6 +1523,7 @@ export default {
     join();
 
     return () => {
+      disposed = true;
       document.body.classList.remove('geo-stage-active');
       document.removeEventListener('selectstart', blockAccidentalSelection, true);
       document.removeEventListener('dragstart', blockAccidentalSelection, true);
