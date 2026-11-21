@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 
 from bots import Bot
-from zombie import ARENA_H, ARENA_W, PERKS, WEAPONS
+from zombie import ARENA_H, ARENA_W, PERKS, WEAPONS, _segment_hits_rect
 
 
 class ZombieBot(Bot):
@@ -177,13 +177,20 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
         sv["firing"] = False
         return
 
-    # Ưu tiên zombie gần nhất hoặc Special Infected / Mini-Boss / Boss
+    obs = room._obstacles()
+
+    def _has_los(z: dict) -> bool:
+        return not any(_segment_hits_rect(sv["x"], sv["y"], z["x"], z["y"], ob) is not None for ob in obs)
+
+    # Ưu tiên zombie nhìn thấy trực tiếp (không bị tường chắn) + Special Infected / Mini-Boss / Boss
     def threat_score(z: dict) -> float:
         d = math.hypot(z["x"] - sv["x"], z["y"] - sv["y"])
         prio = 0.70 if z["kind"] in ("runner", "spitter", "butcher", "queen", "boss", "titan") else 1.0
         return d * prio
 
-    target = min(room.zombies, key=threat_score)
+    visible = [z for z in room.zombies if _has_los(z)]
+    target = min(visible or room.zombies, key=threat_score)
+    target_visible = bool(visible)
     td = math.hypot(target["x"] - sv["x"], target["y"] - sv["y"])
     aim_err = {"easy": 0.16, "normal": 0.08, "hard": 0.025}[level]
     sv["aim"] = math.atan2(target["y"] - sv["y"], target["x"] - sv["x"]) + room.rng.uniform(-aim_err, aim_err)
@@ -209,4 +216,6 @@ def step_bot_survivor(room, player, sv: dict, dt: float, now: float) -> None:
 
     w_range = WEAPONS[best_w]["range"]
     fire_chance = {"easy": 0.55, "normal": 0.82, "hard": 1.0}[level]
-    sv["firing"] = td <= w_range * 1.05 and room.rng.random() <= fire_chance
+    # Z12: Chỉ khai hỏa khi có tầm nhìn trực tiếp (hoặc dùng súng phóng lựu nổ lan) để tránh bắn phí đạn vào tường
+    can_shoot_target = target_visible or WEAPONS[best_w].get("splash", 0.0) > 0
+    sv["firing"] = can_shoot_target and td <= w_range * 1.05 and room.rng.random() <= fire_chance
