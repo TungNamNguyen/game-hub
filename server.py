@@ -32,6 +32,7 @@ import mimetypes
 import os
 import secrets
 import socket
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -53,7 +54,7 @@ import hf_sync
 from chat import FILE_UPLOAD_MAX_BYTES, UPLOAD_MAX_BYTES, ChatError
 from flags_quiz import COUNTRIES as FLAGS_COUNTRIES
 from games import GameError, is_bot_uid
-from geoguessr import warm_all_sv_caches
+from geoguessr import sv_client_config, warm_all_sv_caches
 from hub import APPS, Hub
 
 HOST = "0.0.0.0"
@@ -233,6 +234,29 @@ RT_SSE_PING_EVERY = 15.0
 RT_SESSION_TTL = 35.0
 
 
+def _merge_state_events(old_events: list, new_events: list, cap: int = 40) -> list:
+    """Gộp danh sách events khi thay thế frame state chưa kịp gửi ở HttpSessionSock."""
+    merged: list = []
+    seen_seqs: set = set()
+    for ev in (*old_events, *new_events):
+        if isinstance(ev, dict) and "seq" in ev:
+            s = ev["seq"]
+            if s in seen_seqs:
+                continue
+            seen_seqs.add(s)
+        merged.append(ev)
+    return merged[-cap:]
+
+
+def _fast_json_response(payload: dict, status_code: int = 200) -> Response:
+    """Serialize JSON trực tiếp bỏ qua jsonable_encoder của FastAPI để tăng tốc HTTP fallback."""
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, allow_nan=False),
+        status_code=status_code,
+        media_type="application/json",
+    )
+
+
 class HttpSessionSock:
     """Socket ảo gắn vào Hub cho client chạy qua SSE / HTTP Long-Polling."""
 
@@ -255,6 +279,30 @@ class HttpSessionSock:
             raise RuntimeError("http session closed")
         seq = self.next_seq
         self.next_seq += 1
+        # Coalesce frame "state" chưa kịp gửi của cùng channel để tránh phình RAM
+        # và không đẩy rơi tin chat; đồng thời bảo toàn các event (bắn/nổ) đã sinh ra.
+        if payload.get("t") == "state":
+            ch = payload.get("ch")
+            for idx in range(len(self.queue) - 1, -1, -1):
+                old_seq, old_item = self.queue[idx]
+                if old_seq <= self.sent_seq:
+                    break
+                if old_item.get("t") == "state" and old_item.get("ch") == ch:
+                    merged = payload
+                    old_evs = old_item.get("events")
+                    new_evs = payload.get("events")
+                    if isinstance(old_evs, list) and old_evs and isinstance(new_evs, list):
+                        merged = {**payload, "events": _merge_state_events(old_evs, new_evs)}
+                    # Giữ lại trường tĩnh (catalog, arena, chat, seats...) nếu frame cũ có mà frame delta mới lược bỏ
+                    for static_key in ("catalog", "arena", "chat", "seats", "seatLabels", "seatOrder"):
+                        if static_key not in merged and static_key in old_item:
+                            if merged is payload:
+                                merged = dict(payload)
+                            merged[static_key] = old_item[static_key]
+                    del self.queue[idx]
+                    self.queue.append((seq, merged))
+                    self.event.set()
+                    return
         self.queue.append((seq, payload))
         self.event.set()
 
@@ -265,8 +313,8 @@ class HttpSessionSock:
             self.queue.popleft()
 
     def collect_since(self, cursor: int) -> tuple[int, list[dict]]:
-        """Lấy các gói có seq > cursor và cập nhật sent_seq."""
-        msgs = [item for seq, item in self.queue if seq > cursor]
+        """Lấy các gói có seq > cursor (gắn _seq từng tin để client lọc trùng chính xác)."""
+        msgs = [{**item, "_seq": seq} for seq, item in self.queue if seq > cursor]
         top = self.queue[-1][0] if self.queue else self.sent_seq
         if top > self.sent_seq:
             self.sent_seq = top
@@ -336,14 +384,14 @@ class RtCloseBody(BaseModel):
 async def api_rt_open(payload: RtOpenBody):
     err = _validate_identity(payload.uid, payload.token)
     if err is not None:
-        return {"ok": False, "fatal": err}
+        return _fast_json_response({"ok": False, "fatal": err})
 
     sid = secrets.token_urlsafe(24)
     sock = HttpSessionSock(sid=sid, uid=payload.uid, name=payload.name)
     http_sessions[sid] = sock
     await hub.register(sock, payload.uid, payload.name)
     seq, msgs = sock.collect_since(0)
-    return {"ok": True, "sid": sid, "seq": seq, "messages": msgs}
+    return _fast_json_response({"ok": True, "sid": sid, "seq": seq, "messages": msgs})
 
 
 @app.get("/api/rt/poll")
@@ -359,7 +407,7 @@ async def api_rt_poll(request: Request, sid: str = "", ack: int = 0):
     cursor = ack if ack < sock.sent_seq else sock.sent_seq
     seq, msgs = sock.collect_since(cursor)
     if msgs:
-        return {"ok": True, "seq": seq, "messages": msgs}
+        return _fast_json_response({"ok": True, "seq": seq, "messages": msgs})
 
     deadline = time.monotonic() + RT_POLL_TIMEOUT
     while not sock.closed:
@@ -376,10 +424,10 @@ async def api_rt_poll(request: Request, sid: str = "", ack: int = 0):
         seq, msgs = sock.collect_since(sock.sent_seq)
         if msgs:
             sock.touch()
-            return {"ok": True, "seq": seq, "messages": msgs}
+            return _fast_json_response({"ok": True, "seq": seq, "messages": msgs})
 
     sock.touch()
-    return {"ok": True, "seq": sock.sent_seq, "messages": []}
+    return _fast_json_response({"ok": True, "seq": sock.sent_seq, "messages": []})
 
 
 @app.get("/api/rt/stream")
@@ -442,12 +490,12 @@ async def api_rt_send(payload: RtSendBody):
 
     sock.touch()
     sock.ack(payload.ack)
-    for msg in payload.messages:
+    for msg in payload.messages[:32]:
         if isinstance(msg, dict):
             await hub.dispatch(session, msg)
 
     seq, msgs = sock.collect_since(sock.sent_seq)
-    return {"ok": True, "seq": seq, "messages": msgs}
+    return _fast_json_response({"ok": True, "seq": seq, "messages": msgs})
 
 
 @app.post("/api/rt/close")
@@ -512,12 +560,12 @@ def healthz():
 
 
 @app.get("/api/apps")
-def api_apps():
+async def api_apps():
     return {"apps": APPS}
 
 
 @app.get("/api/modes/{channel}")
-def api_modes(channel: str):
+async def api_modes(channel: str):
     manager = game_manager(channel)
     room_class = manager.room_class
     return {"modes": [{"id": k, **v} for k, v in room_class.MODES.items()],
@@ -525,13 +573,13 @@ def api_modes(channel: str):
 
 
 @app.get("/api/rooms")
-def api_rooms():
+async def api_rooms():
     return {"rooms": {ch: mgr.lobby() for ch, mgr in hub.managers.items()},
             "online": len(hub.presence())}
 
 
 @app.post("/api/rooms")
-def api_create_room(payload: CreateRoom):
+async def api_create_room(payload: CreateRoom):
     manager = game_manager(payload.channel)
     try:
         return {"code": manager.create(payload.mode, config=payload.config).code}
@@ -540,7 +588,7 @@ def api_create_room(payload: CreateRoom):
 
 
 @app.post("/api/rooms/quick")
-def api_quick_room(payload: CreateRoom):
+async def api_quick_room(payload: CreateRoom):
     manager = game_manager(payload.channel)
     try:
         return {"code": manager.quick(payload.mode, config=payload.config).code}
@@ -549,7 +597,7 @@ def api_quick_room(payload: CreateRoom):
 
 
 @app.post("/api/rooms/solo")
-def api_solo_room(payload: CreateRoom):
+async def api_solo_room(payload: CreateRoom):
     """Phòng chơi với máy. Máy ngồi sẵn một ghế, người tạo vào ghế còn lại."""
     manager = game_manager(payload.channel)
     if not bots.supports(payload.channel):
@@ -562,7 +610,7 @@ def api_solo_room(payload: CreateRoom):
 
 
 @app.get("/api/bots")
-def api_bots():
+async def api_bots():
     return {"channels": bots.bot_channels(), "levels": bots.levels_info(),
             "default": bots.DEFAULT_LEVEL}
 
@@ -577,7 +625,7 @@ def api_poker_leaderboard():
 
 
 @app.get("/api/flags/countries")
-def api_flags_countries():
+async def api_flags_countries():
     """Danh sách rút gọn 197 quốc gia & thủ đô dùng làm gợi ý gõ nhanh phía client."""
     return {
         "countries": [
@@ -594,20 +642,60 @@ def api_flags_countries():
     }
 
 
+@app.get("/api/geo/sv-config")
+async def api_geo_sv_config():
+    """Cấu hình khung tìm Google Street View để trình duyệt nạp hộ khi server bị chặn outbound."""
+    return sv_client_config()
+
+
 # --------------------------------------------------------------------------- #
 # HTTP: chat (kênh + ảnh)
 # --------------------------------------------------------------------------- #
+_RATE_LOCK = threading.Lock()
+_RATE_BUCKETS: dict[tuple[str, str], deque[float]] = {}
+
+
+def _require_chat_auth_and_rate(
+    request: Request,
+    *,
+    bucket: str,
+    limit: int,
+    window: float = 60.0,
+    uid_param: str = "",
+    token_param: str = "",
+) -> str:
+    uid = (request.headers.get("x-hub-uid") or uid_param or "").strip()
+    token = (request.headers.get("x-hub-token") or token_param or "").strip()
+    if not uid or len(uid) > 64 or is_bot_uid(uid):
+        raise HTTPException(401, "Cần định danh người dùng hợp lệ để thao tác.")
+    if not hub.directory.verify_or_bind_token(uid, token):
+        raise HTTPException(403, "Token xác thực không hợp lệ.")
+    now = time.monotonic()
+    key = (bucket, uid)
+    with _RATE_LOCK:
+        dq = _RATE_BUCKETS.setdefault(key, deque())
+        while dq and now - dq[0] > window:
+            dq.popleft()
+        if len(dq) >= limit:
+            raise HTTPException(429, "Thao tác quá nhanh, vui lòng thử lại sau ít phút.")
+        dq.append(now)
+    return uid
+
+
 class NewChannel(BaseModel):
     title: str = ""
 
 
 @app.get("/api/chat/channels")
-def api_chat_channels(uid: str = ""):
+async def api_chat_channels(uid: str = ""):
     return {"channels": hub.chat.channel_list(uid)}
 
 
 @app.post("/api/chat/channels")
-def api_chat_create(payload: NewChannel):
+def api_chat_create(payload: NewChannel, request: Request, uid: str = "", token: str = ""):
+    _require_chat_auth_and_rate(
+        request, bucket="chat_channel", limit=5, window=60.0, uid_param=uid, token_param=token
+    )
     try:
         return hub.chat.create_channel(payload.title)
     except ChatError as exc:
@@ -615,13 +703,16 @@ def api_chat_create(payload: NewChannel):
 
 
 @app.post("/api/chat/upload")
-def api_chat_upload(file: UploadFile = File(...)):
+def api_chat_upload(request: Request, file: UploadFile = File(...), uid: str = "", token: str = ""):
     """Nhận ảnh.
 
     Hàm sync có chủ ý: FastAPI sẽ chạy nó trên threadpool, nên lúc Pillow
     re-encode một ảnh lớn thì event loop vẫn phục vụ được chat và game.
     Đọc quá hạn mức 1 byte để phát hiện file vượt cỡ mà không nạp hết vào RAM.
     """
+    _require_chat_auth_and_rate(
+        request, bucket="chat_upload", limit=12, window=60.0, uid_param=uid, token_param=token
+    )
     raw = file.file.read(UPLOAD_MAX_BYTES + 1)
     if len(raw) > UPLOAD_MAX_BYTES:
         raise HTTPException(413, f"Ảnh quá lớn, tối đa {UPLOAD_MAX_BYTES // (1024 * 1024)}MB.")
@@ -632,8 +723,11 @@ def api_chat_upload(file: UploadFile = File(...)):
 
 
 @app.post("/api/chat/upload-file")
-def api_chat_upload_file(file: UploadFile = File(...)):
+def api_chat_upload_file(request: Request, file: UploadFile = File(...), uid: str = "", token: str = ""):
     """Nhận file đính kèm trong chat (tối đa 15MB)."""
+    _require_chat_auth_and_rate(
+        request, bucket="chat_upload", limit=12, window=60.0, uid_param=uid, token_param=token
+    )
     raw = file.file.read(FILE_UPLOAD_MAX_BYTES + 1)
     if len(raw) > FILE_UPLOAD_MAX_BYTES:
         raise HTTPException(
@@ -742,4 +836,4 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=HTTP_PORT, log_level="warning",
-                ws_ping_interval=20)
+                ws_ping_interval=20, ws_max_size=65536)
