@@ -2366,12 +2366,101 @@ export default {
     const onMouseUp = () => { mouseDown = false; };
     const onContext = (e) => { e.preventDefault(); };
 
+    // Z6: Nhả toàn bộ phím/chuột/cảm ứng khi Alt-Tab hoặc chuyển tab để không bị kẹt di chuyển/bắn
+    let moveTouchId = null;
+    let moveOriginX = 0;
+    let moveOriginY = 0;
+    let aimTouchId = null;
+    const releaseInputs = () => {
+      keys.clear();
+      mouseDown = false;
+      touchMove.vx = 0;
+      touchMove.vy = 0;
+      moveTouchId = null;
+      aimTouchId = null;
+      if (state && state.status === 'playing' && state.you?.mark) {
+        const me = (state.survivors || []).find((x) => x.mark === state.you.mark);
+        if (me && me.alive && !me.downed) {
+          send('input', { vx: 0, vy: 0, aim: +(me.aim || 0).toFixed(3), firing: false });
+        }
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) releaseInputs();
+    };
+
+    // Z10: Twin-stick cảm ứng (nửa trái màn hình di chuyển, nửa phải ngắm & khai hỏa)
+    const onTouchStart = (e) => {
+      if (shopOpen) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const midX = rect.left + rect.width * 0.5;
+      for (const tc of Array.from(e.changedTouches)) {
+        if (tc.clientX < midX && moveTouchId === null) {
+          moveTouchId = tc.identifier;
+          moveOriginX = tc.clientX;
+          moveOriginY = tc.clientY;
+          touchMove.vx = 0;
+          touchMove.vy = 0;
+        } else if (aimTouchId === null) {
+          aimTouchId = tc.identifier;
+          hasMouseMoved = true;
+          mouseScreenX = tc.clientX;
+          mouseScreenY = tc.clientY;
+          updateMouseWorld();
+          mouseDown = true;
+        }
+      }
+    };
+    const onTouchMove = (e) => {
+      if (shopOpen) return;
+      e.preventDefault();
+      for (const tc of Array.from(e.changedTouches)) {
+        if (tc.identifier === moveTouchId) {
+          const dx = tc.clientX - moveOriginX;
+          const dy = tc.clientY - moveOriginY;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 8) {
+            const scale = Math.min(1, dist / 48);
+            touchMove.vx = (dx / dist) * scale;
+            touchMove.vy = (dy / dist) * scale;
+          } else {
+            touchMove.vx = 0;
+            touchMove.vy = 0;
+          }
+        } else if (tc.identifier === aimTouchId) {
+          hasMouseMoved = true;
+          mouseScreenX = tc.clientX;
+          mouseScreenY = tc.clientY;
+          updateMouseWorld();
+        }
+      }
+    };
+    const onTouchEnd = (e) => {
+      for (const tc of Array.from(e.changedTouches)) {
+        if (tc.identifier === moveTouchId) {
+          moveTouchId = null;
+          touchMove.vx = 0;
+          touchMove.vy = 0;
+        } else if (tc.identifier === aimTouchId) {
+          aimTouchId = null;
+          mouseDown = false;
+        }
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', releaseInputs);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('contextmenu', onContext);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
 
     /* ------------------------------------------- State Sync -------------- */
     function renderState() {
@@ -2425,6 +2514,15 @@ export default {
 
     const stopNet = net.on(CHANNEL, (msg) => {
       if (msg.t === 'state') {
+        // Giữ lại các trường tĩnh (catalog, arena, seats, chat...) khi server gửi delta frame 15 Hz
+        if (state) {
+          if (!msg.catalog && state.catalog) msg.catalog = state.catalog;
+          if (!msg.arena && state.arena) msg.arena = state.arena;
+          if (!msg.chat && state.chat) msg.chat = state.chat;
+          if (!msg.seats && state.seats) msg.seats = state.seats;
+          if (!msg.seatLabels && state.seatLabels) msg.seatLabels = state.seatLabels;
+          if (!msg.seatOrder && state.seatOrder) msg.seatOrder = state.seatOrder;
+        }
         state = msg;
         renderState();
       } else if (msg.t === 'error') {
@@ -2444,10 +2542,16 @@ export default {
       clearInterval(inputTimer);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', releaseInputs);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('contextmenu', onContext);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
       stopNet();
       stopRejoin();
       send('leave');
