@@ -16,9 +16,11 @@ import hashlib
 import hmac
 import json
 import os
+import threading
 import time
 import traceback
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import bots
 import db
@@ -74,7 +76,7 @@ APPS = [
     {"id": "ludo", "name": "Cờ Cá Ngựa",
      "desc": "Đua ngựa 4 người, cản đường, Đá Hậu và leo chuồng 1–6"},
     {"id": "zombie", "name": "Đêm Tử Thần",
-     "desc": "Bắn súng sinh tồn Zombie Co-op 1–4 người, 6 vũ khí, Boss & Trụ súng"},
+     "desc": "Bắn súng sinh tồn Zombie Co-op 1–6 người, 8 vũ khí, 9 chủng quái, Boss & Trụ súng"},
     {"id": "faces", "name": "Tạo avatar",
      "desc": "Bấm một nút ra một mặt người mới, dùng làm ảnh đại diện"},
 ]
@@ -84,13 +86,28 @@ def color_for(uid: str) -> str:
     return PALETTE[sum(uid.encode()) % len(PALETTE)]
 
 
+def atomic_write_json(path: Path, data: object, *, indent: int | None = None) -> None:
+    """Ghi JSON nguyên tử (file tạm cùng thư mục + os.replace) tránh hỏng file khi crash hoặc ghi đồng thời."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    text = json.dumps(data, ensure_ascii=False, indent=indent)
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        with contextlib.suppress(OSError):
+            if tmp.exists():
+                tmp.unlink()
+
+
 class ProfileStore:
     """uid -> {name, color} mới nhất. Lưu xuống Postgres (hoặc profiles.json)
     để tên hiển thị đúng ngay cả khi server restart."""
 
     def __init__(self, data_dir) -> None:
-        self.path = data_dir / "profiles.json"
-        self.tokens_path = data_dir / "tokens.json"
+        self.path = Path(data_dir) / "profiles.json"
+        self.tokens_path = Path(data_dir) / "tokens.json"
+        self._lock = threading.Lock()
         self.data: dict[str, dict] = {}
         self.tokens: dict[str, str] = {}
         if self.tokens_path.exists():
@@ -100,12 +117,18 @@ class ProfileStore:
                     self.tokens = {str(k): str(v) for k, v in loaded.items()}
         if db.is_enabled():
             with db.connection() as conn:
-                rows = conn.execute("select uid, name, color from public.profiles").fetchall()
-            for uid, name, color in rows:
+                rows = conn.execute(
+                    "select uid, name, color, token_hash from public.profiles"
+                ).fetchall()
+            for uid, name, color, token_hash in rows:
                 self.data[uid] = {"name": name, "color": color}
+                if token_hash:
+                    self.tokens[uid] = str(token_hash)
         elif self.path.exists():
             with contextlib.suppress(Exception):
-                self.data = json.loads(self.path.read_text(encoding="utf-8"))
+                loaded = json.loads(self.path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    self.data = loaded
 
     def verify_or_bind_token(self, uid: str, token: str) -> bool:
         """Xác thực hoặc gắn chặt secret token lần đầu cho ``uid``.
@@ -115,40 +138,57 @@ class ProfileStore:
         tài khoản mật khẩu.
         """
         clean_tok = (token or "").strip()
-        existing = self.tokens.get(uid)
-        if not clean_tok:
-            return existing is None
-        if len(clean_tok) > 128:
-            return False
-        digest = hashlib.sha256(clean_tok.encode("utf-8")).hexdigest()
-        if existing is None:
-            self.tokens[uid] = digest
-            with contextlib.suppress(Exception):
-                self.tokens_path.write_text(
-                    json.dumps(self.tokens, ensure_ascii=False), encoding="utf-8"
-                )
-            return True
-        return hmac.compare_digest(existing, digest)
+        with self._lock:
+            existing = self.tokens.get(uid)
+            if not clean_tok:
+                return existing is None
+            if len(clean_tok) > 128:
+                return False
+            digest = hashlib.sha256(clean_tok.encode("utf-8")).hexdigest()
+            if existing is None:
+                self.tokens[uid] = digest
+                if db.is_enabled():
+                    prof = self.data.get(uid) or {}
+                    with contextlib.suppress(Exception), db.connection() as conn:
+                        conn.execute(
+                            """
+                            insert into public.profiles (uid, name, color, token_hash)
+                            values (%s, %s, %s, %s)
+                            on conflict (uid)
+                            do update set
+                                token_hash = coalesce(public.profiles.token_hash, excluded.token_hash),
+                                updated_at = now()
+                            """,
+                            (uid, prof.get("name") or "Người chơi", prof.get("color") or color_for(uid), digest),
+                        )
+                else:
+                    with contextlib.suppress(Exception):
+                        atomic_write_json(self.tokens_path, dict(self.tokens))
+                return True
+            return hmac.compare_digest(existing, digest)
 
     def update(self, uid: str, name: str, color: str) -> None:
-        self.data[uid] = {"name": name, "color": color}
-        if db.is_enabled():
-            with contextlib.suppress(Exception), db.connection() as conn:
-                conn.execute(
-                    """
-                    insert into public.profiles (uid, name, color)
-                    values (%s, %s, %s)
-                    on conflict (uid)
-                    do update set
-                        name = excluded.name,
-                        color = excluded.color,
-                        updated_at = now()
-                    """,
-                    (uid, name, color),
-                )
-        else:
-            with contextlib.suppress(Exception):
-                self.path.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")
+        with self._lock:
+            self.data[uid] = {"name": name, "color": color}
+            token_hash = self.tokens.get(uid)
+            if db.is_enabled():
+                with contextlib.suppress(Exception), db.connection() as conn:
+                    conn.execute(
+                        """
+                        insert into public.profiles (uid, name, color, token_hash)
+                        values (%s, %s, %s, %s)
+                        on conflict (uid)
+                        do update set
+                            name = excluded.name,
+                            color = excluded.color,
+                            token_hash = coalesce(public.profiles.token_hash, excluded.token_hash),
+                            updated_at = now()
+                        """,
+                        (uid, name, color, token_hash),
+                    )
+            else:
+                with contextlib.suppress(Exception):
+                    atomic_write_json(self.path, dict(self.data))
 
     def snapshot(self, avatars: AvatarStore | None = None) -> dict[str, dict]:
         """avatar không lưu ở đây (AvatarStore đã tự quản theo uid) — ghép vào
@@ -170,6 +210,8 @@ class Session:
     rooms: dict[str, str] = field(default_factory=dict)   # channel -> mã phòng
     app: str = "home"
     joined: float = field(default_factory=time.time)
+    last_rename: float = 0.0
+    last_typing: float = 0.0
 
 
 class Hub:
@@ -218,7 +260,14 @@ class Hub:
     # ---- gửi tin ----------------------------------------------------------- #
     async def send(self, session: Session, payload: dict) -> bool:
         try:
-            await session.sock.send_json(payload)
+            await asyncio.wait_for(session.sock.send_json(payload), timeout=2.5)
+            return True
+        except Exception:
+            return False
+
+    async def send_text(self, session: Session, raw: str) -> bool:
+        try:
+            await asyncio.wait_for(session.sock.send_text(raw), timeout=2.5)
             return True
         except Exception:
             return False
@@ -278,8 +327,6 @@ class Hub:
         session = self.sessions.pop(sock, None)
         if session is None:
             return
-        # Chỉ báo rời phòng khi người này không còn tab nào khác đang mở.
-        still_here = any(s.uid == session.uid for s in self.sessions.values())
         for channel in GAME_CHANNELS:
             code = session.rooms.get(channel)
             if not code:
@@ -287,7 +334,12 @@ class Hub:
             room = self.managers[channel].get(code)
             if room is None:
                 continue
-            if not still_here:
+            # Chỉ báo rời phòng khi người này không còn tab nào khác đang mở ĐÚNG phòng đó.
+            still_in_room = any(
+                s.uid == session.uid and s.rooms.get(channel) == code
+                for s in self.sessions.values()
+            )
+            if not still_in_room:
                 room.disconnect(session.uid)
             await self.broadcast_room(channel, code)
         await self.broadcast_presence()
@@ -318,7 +370,7 @@ class Hub:
     def room_sessions(self, channel: str, code: str):
         return [s for s in self.sessions.values() if s.rooms.get(channel) == code]
 
-    async def broadcast_room(self, channel: str, code: str) -> None:
+    async def broadcast_room(self, channel: str, code: str, *, full: bool = True) -> None:
         room = self.managers[channel].get(code)
         peers = self.room_sessions(channel, code)
         if room is None:
@@ -326,7 +378,26 @@ class Hub:
             return
         if getattr(room, "avatar_for", None) is None:
             room.avatar_for = self.avatars.url
-        await self.fan_out(peers, lambda s: {"ch": channel, "t": "state", **room.view(s.uid)})
+        if peers:
+            shared_fn = getattr(room, "shared_view", None)
+            you_fn = getattr(room, "you_view", None)
+            if callable(shared_fn) and callable(you_fn):
+                shared = shared_fn(full=full)
+                shared_payload = {"ch": channel, "t": "state", **shared}
+                ws_peers = [s for s in peers if callable(getattr(s.sock, "send_text", None))]
+                json_peers = [s for s in peers if not callable(getattr(s.sock, "send_text", None))]
+                tasks = []
+                if ws_peers:
+                    prefix = json.dumps(shared_payload, ensure_ascii=False, allow_nan=False)[:-1]
+                    for s in ws_peers:
+                        you_json = json.dumps(you_fn(s.uid), ensure_ascii=False, allow_nan=False)
+                        tasks.append(self.send_text(s, f'{prefix},"you":{you_json}}}'))
+                for s in json_peers:
+                    tasks.append(self.send(s, {**shared_payload, "you": you_fn(s.uid)}))
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            else:
+                await self.fan_out(peers, lambda s: {"ch": channel, "t": "state", **room.view(s.uid)})
         # Gọi sau khi phát trạng thái: người chơi thấy nước của mình trước, rồi
         # mới tới lượt máy nghĩ.
         self.schedule_bot(channel, code)
@@ -651,6 +722,10 @@ class Hub:
             return
 
         if kind == "typing":
+            now = time.monotonic()
+            if now - session.last_typing < 0.8:
+                return
+            session.last_typing = now
             await self.fan_out(
                 [s for s in self.sessions.values()
                  if s.rooms.get("chat") == room and s.uid != session.uid],
@@ -677,6 +752,10 @@ class Hub:
                     pong["ts"] = msg["ts"]
                 await self.send(session, pong)
             elif kind == "rename":
+                now = time.monotonic()
+                if now - session.last_rename < 1.5:
+                    return
+                session.last_rename = now
                 session.name = clean_name(str(msg.get("name", "")))
                 await asyncio.to_thread(self.directory.update, session.uid, session.name, session.color)
                 for game_channel in GAME_CHANNELS:
@@ -726,13 +805,25 @@ class Hub:
                 await self.handle_chat(session, kind, msg)
         except (GameError, ChatError) as exc:
             await self.send_error(session, channel, str(exc))
-        except (TypeError, ValueError, KeyError):
+        except (TypeError, ValueError, KeyError, OverflowError):
             await self.send_error(session, channel, "Dữ liệu không hợp lệ.")
         except Exception:
             traceback.print_exc()
             await self.send_error(session, channel, "Lỗi nội bộ khi xử lý thao tác.")
 
     # ---- đồng hồ của phòng ------------------------------------------------- #
+    async def _handle_room_tick_error(self, channel: str, code: str, manager: RoomManager, room) -> None:
+        traceback.print_exc()
+        errs = getattr(room, "_tick_errors", 0) + 1
+        room._tick_errors = errs
+        if errs >= 5:
+            manager.rooms.pop(code, None)
+            peers = self.room_sessions(channel, code)
+            await self.fan_out(
+                peers,
+                lambda s: {"ch": channel, "t": "closed", "message": "Phòng gặp lỗi lặp lại và đã tự đóng."},
+            )
+
     async def tick_loop(self, every: float = TICK_EVERY) -> None:
         """Đẩy đồng hồ của những phòng có hạn thời gian.
 
@@ -743,8 +834,10 @@ class Hub:
         """
         while True:
             await asyncio.sleep(every)
-            with contextlib.suppress(Exception):
+            try:
                 await self._tick_once()
+            except Exception:
+                traceback.print_exc()
 
     async def fast_tick_loop(self, every: float = 0.066) -> None:
         """Nhịp mô phỏng thời gian thực 15 Hz cho các game hành động (Đêm Tử Thần).
@@ -752,18 +845,24 @@ class Hub:
         Chỉ hoạt động khi có phòng ``FAST_TICK`` đang trong trận; lúc rảnh ngủ 0.25s để tiết kiệm CPU.
         """
         while True:
+            started = time.monotonic()
             active_found = False
-            with contextlib.suppress(Exception):
-                for channel, manager in self.managers.items():
-                    if not getattr(manager.room_class, "FAST_TICK", False):
-                        continue
-                    for code, room in list(manager.rooms.items()):
+            for channel, manager in self.managers.items():
+                if not getattr(manager.room_class, "FAST_TICK", False):
+                    continue
+                for code, room in list(manager.rooms.items()):
+                    try:
                         if not room.has_connection() or not room.in_progress():
                             continue
                         active_found = True
                         if room.tick():
-                            await self.broadcast_room(channel, code)
-            await asyncio.sleep(every if active_found else 0.25)
+                            await self.broadcast_room(channel, code, full=False)
+                        room._tick_errors = 0
+                    except Exception:
+                        await self._handle_room_tick_error(channel, code, manager, room)
+            elapsed = time.monotonic() - started
+            sleep_for = max(0.005, every - elapsed) if active_found else 0.25
+            await asyncio.sleep(sleep_for)
 
     async def _tick_once(self) -> None:
         for channel, manager in self.managers.items():
@@ -773,23 +872,28 @@ class Hub:
                 continue
             # list() vì broadcast có thể làm phòng bị xoá giữa lúc đang lặp.
             for code, room in list(manager.rooms.items()):
-                # Phòng không còn ai xem thì đóng băng, không để máy tự đấu với
-                # nhau tới hết ván trong một phòng vắng.
-                if not room.has_connection():
-                    continue
-                if isinstance(room, GeoRoom):
-                    if room.loading_round:
+                try:
+                    # Phòng không còn ai xem thì đóng băng, không để máy tự đấu với
+                    # nhau tới hết ván trong một phòng vắng.
+                    if not room.has_connection():
                         continue
-                    need = room.needs_network_fetch_on_tick()
-                    if need > 0:
-                        room.loading_round = True
-                        asyncio.create_task(self._geo_async_tick(channel, code, room, need))
+                    if isinstance(room, GeoRoom):
+                        if room.loading_round:
+                            continue
+                        need = room.needs_network_fetch_on_tick()
+                        if need > 0:
+                            room.loading_round = True
+                            asyncio.create_task(self._geo_async_tick(channel, code, room, need))
+                            continue
+                        if room.tick(allow_live_fetch=False):
+                            await self.broadcast_room(channel, code)
+                        room._tick_errors = 0
                         continue
-                    if room.tick(allow_live_fetch=False):
+                    if room.tick():
                         await self.broadcast_room(channel, code)
-                    continue
-                if room.tick():
-                    await self.broadcast_room(channel, code)
+                    room._tick_errors = 0
+                except Exception:
+                    await self._handle_room_tick_error(channel, code, manager, room)
 
     # ---- dọn phòng chết ---------------------------------------------------- #
     async def prune_loop(self, every: float = 120.0, idle: float = 1800.0) -> None:
