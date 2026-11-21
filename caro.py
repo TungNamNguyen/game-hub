@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from games import GameError, SeatedRoom, other_mark
+from games import GameError, SeatedRoom, int_field, other_mark
 
 # 4 hướng là đủ phủ 8 chiều, vì mỗi hướng ta dò cả hai phía.
 DIRECTIONS = ((1, 0), (0, 1), (1, 1), (1, -1))
@@ -77,7 +77,7 @@ class CaroRoom(SeatedRoom):
     def handle(self, uid: str, action: str, msg: dict) -> None:
         if action != "move":
             raise GameError("Hành động không hợp lệ.")
-        self.move(uid, int(msg.get("index", -1)))
+        self.move(uid, int_field(msg, "index", -1))
 
     def move(self, uid: str, index: int) -> None:
         player = self.players.get(uid)
