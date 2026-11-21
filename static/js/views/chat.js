@@ -451,7 +451,11 @@ export default {
         const prepared = await resizeImageFile(file, 2000, 0.85);
         const form = new FormData();
         form.append('file', prepared);
-        const res = await fetch('/api/chat/upload', { method: 'POST', body: form });
+        const res = await fetch('/api/chat/upload', {
+          method: 'POST',
+          body: form,
+          headers: { 'X-Hub-Uid': net.uid || '', 'X-Hub-Token': net.token || '' },
+        });
         if (!res.ok) {
           let detail = t('shell.uploadFailed');
           try { detail = (await res.json()).detail || detail; } catch { /* trống */ }
@@ -477,7 +481,11 @@ export default {
       try {
         const form = new FormData();
         form.append('file', file);
-        const res = await fetch('/api/chat/upload-file', { method: 'POST', body: form });
+        const res = await fetch('/api/chat/upload-file', {
+          method: 'POST',
+          body: form,
+          headers: { 'X-Hub-Uid': net.uid || '', 'X-Hub-Token': net.token || '' },
+        });
         if (!res.ok) {
           let detail = t('chat.fileUploadErr');
           try { detail = (await res.json()).detail || detail; } catch { /* trống */ }
