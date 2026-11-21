@@ -45,6 +45,7 @@ TRACK_LEN = 56
 HOME_DOOR_PROGRESS = TRACK_LEN - 1  # 55
 HOME_TARGET = [58, 59, 60, 61]      # bậc 3, 4, 5, 6
 TURN_SECONDS = 30.0
+AWAY_TURN_SECONDS = 6.0
 BOT_NAMES = ("Ngựa Xích Thố", "Chiến Mã Xanh", "Hoàng Phi", "Lục Phong")
 
 
@@ -382,6 +383,19 @@ class LudoRoom(SeatedRoom):
                 return cand
         return alive[0]
 
+    def _turn_seconds(self, color: str) -> float:
+        p = self.seat(color)
+        if p is not None and not p.bot and not p.connected:
+            return AWAY_TURN_SECONDS
+        return TURN_SECONDS
+
+    def disconnect(self, uid: str) -> None:
+        super().disconnect(uid)
+        if self.in_progress() and self.phase in ("roll", "move") and self.turn:
+            p = self.seat(self.turn)
+            if p is not None and not p.bot and not p.connected:
+                self.deadline = min(self.deadline, time.time() + AWAY_TURN_SECONDS)
+
     def _begin_turn(self, color: str, *, reset_sixes: bool = False) -> None:
         self.turn = color
         self.phase = "roll"
@@ -389,7 +403,7 @@ class LudoRoom(SeatedRoom):
         self.legal_moves = []
         if reset_sixes:
             self.consecutive_sixes = 0
-        self.deadline = time.time() + TURN_SECONDS
+        self.deadline = time.time() + self._turn_seconds(color)
         self.touched = time.time()
 
     def _advance_turn(self) -> None:
@@ -550,7 +564,7 @@ class LudoRoom(SeatedRoom):
 
         self.legal_moves = moves
         self.phase = "move"
-        self.deadline = time.time() + TURN_SECONDS
+        self.deadline = time.time() + self._turn_seconds(self.turn)
         self.touched = time.time()
 
     def _do_move(self, mark: str, piece_idx: int, kind: str = "") -> None:
