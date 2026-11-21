@@ -404,3 +404,137 @@ def test_zombie_miniboss_and_titan_telegraph_skills():
     assert len(view["bosses"]) == 1
     assert view["bosses"][0]["kind"] == "titan"
     assert len(view["telegraphs"]) >= 1
+
+
+def test_zombie_bot_proactive_movement_and_gadgets():
+    room = ZombieRoom("ZAI1", "outpost")
+    room.join("u1", "Leader", "#38bdf8")
+    room.handle("u1", "add_bot", {"mark": "2", "level": "normal"})
+    room.handle("u1", "start", {})
+
+    sv_h = room.survivors["1"]
+    sv_b = room.survivors["2"]
+    sv_h["x"], sv_h["y"] = 500.0, 450.0
+    sv_b["x"], sv_b["y"] = 780.0, 450.0
+    room.zombies.clear()
+    room.wave_remaining_to_spawn = ["walker"]
+    room.spawn_timer = 99.0
+
+    # 1. Zombie ở tầm trung (~320px): bot phải chủ động di chuyển (strafe / điều chỉnh vị trí), không đứng yên
+    z1 = room._spawn_one_zombie("walker")
+    z1["x"], z1["y"] = 1100.0, 450.0
+    z1["hp"] = 500.0
+    start_x, start_y = sv_b["x"], sv_b["y"]
+    for _ in range(8):
+        room.tick(dt_override=0.066)
+    moved_dist = math.hypot(sv_b["x"] - start_x, sv_b["y"] - start_y)
+    assert moved_dist > 25.0, f"Bot should actively reposition/strafe, moved only {moved_dist:.1f}px"
+
+    # 2. Cụm 2 zombie trong tầm ném: bot chủ động ném lựu đạn (EMP / Cryo / Grenade)
+    sv_b["x"], sv_b["y"] = 760.0, 450.0
+    sv_b["_botThrowCd"] = 0.0
+    sv_b["emps"] = 0
+    sv_b["cryos"] = 0
+    sv_b["grenades"] = 2
+    room.zombies.clear()
+    room.projectiles.clear()
+    za = room._spawn_one_zombie("walker")
+    zb = room._spawn_one_zombie("walker")
+    za["x"], za["y"] = 960.0, 450.0
+    zb["x"], zb["y"] = 985.0, 465.0
+    za["hp"] = zb["hp"] = 400.0
+    room.tick(dt_override=0.066)
+    assert sv_b["grenades"] == 1
+    assert any(p["kind"] == "grenade" and p["owner"] == "2" for p in room.projectiles)
+
+    # 3. Gặp Boss + có EMP: bot chủ động ném EMP để làm choáng
+    sv_b["_botThrowCd"] = 0.0
+    sv_b["emps"] = 1
+    room.zombies.clear()
+    room.projectiles.clear()
+    boss = room._spawn_one_zombie("boss")
+    boss["x"], boss["y"] = 970.0, 450.0
+    room.tick(dt_override=0.066)
+    assert sv_b["emps"] == 0
+    assert any(p["kind"] == "emp" and p["owner"] == "2" for p in room.projectiles)
+
+    # 4. Trong pha shop: bot tự mua bổ sung lựu đạn & di chuyển đi nhặt tiền rơi
+    room.phase = "shop"
+    room.shop_deadline = time.time() + 16.0
+    sv_b["grenades"] = 0
+    sv_b["cryos"] = 0
+    sv_b["emps"] = 0
+    sv_b["money"] = 600
+    sv_b["x"], sv_b["y"] = 700.0, 450.0
+    room.pickups = [{"id": 999, "kind": "cash", "x": 810.0, "y": 450.0, "ttl": 15.0}]
+    for _ in range(12):
+        room.tick(dt_override=0.066)
+    assert sv_b["grenades"] >= 2
+    assert sv_b["x"] > 720.0
+
+
+def test_zombie_enemy_scaling_by_squad_size_and_smart_ai():
+    # 1. So sánh 1 chiến binh vs 6 chiến binh: số lượng, HP quái thường/Boss, sát thương & tốc độ phải scale rõ rệt
+    r1 = ZombieRoom("ZSC1", "outpost")
+    r1.join("u1", "Solo", "#38bdf8")
+    r1.handle("u1", "start", {})
+
+    r6 = ZombieRoom("ZSC6", "outpost")
+    r6.join("u1", "Lead", "#38bdf8")
+    for idx in range(2, 7):
+        r6.handle("u1", "add_bot", {"mark": str(idx), "level": "normal"})
+    r6.handle("u1", "start", {})
+
+    q1_w5 = r1._build_wave_queue(5)
+    q6_w5 = r6._build_wave_queue(5)
+    assert len(q6_w5) >= int(len(q1_w5) * 2.2), f"6p wave should scale up strongly: {len(q1_w5)} vs {len(q6_w5)}"
+    assert "boss" in q6_w5 and "butcher" in q6_w5  # Phòng 6 người ở đợt Boss có thêm Mini-Boss hộ tống
+
+    z1_w = r1._spawn_one_zombie("walker")
+    z6_w = r6._spawn_one_zombie("walker")
+    assert z6_w["maxHp"] > z1_w["maxHp"] * 1.65
+    assert z6_w["dmg"] > z1_w["dmg"] * 1.30
+    assert z6_w["speed"] > z1_w["speed"] * 1.15
+
+    z1_b = r1._spawn_one_zombie("boss")
+    z6_b = r6._spawn_one_zombie("boss")
+    assert z6_b["maxHp"] > z1_b["maxHp"] * 2.4
+
+    # 2. AI Zombie chọn mục tiêu thông minh: ưu tiên kết liễu người thấp máu ở cùng khoảng cách
+    r6.zombies.clear()
+    r6.wave_remaining_to_spawn = ["walker"]
+    r6.spawn_timer = 99.0
+    sv_healthy = r6.survivors["1"]
+    sv_low = r6.survivors["2"]
+    for m, s in r6.survivors.items():
+        if m not in ("1", "2"):
+            s["x"], s["y"] = 1450.0, 820.0
+    sv_healthy["x"], sv_healthy["y"] = 600.0, 450.0
+    sv_healthy["hp"] = sv_healthy["maxHp"]
+    sv_low["x"], sv_low["y"] = 800.0, 450.0
+    sv_low["hp"] = sv_low["maxHp"] * 0.25
+    runner = r6._spawn_one_zombie("runner")
+    runner["x"], runner["y"] = 700.0, 450.0
+    chosen = r6._choose_zombie_target(runner, [sv_healthy, sv_low], [])
+    assert chosen["mark"] == "2"
+
+    # 3. Spitter bắn đón đầu theo hướng di chuyển (lead shot)
+    sv_low["x"], sv_low["y"] = 700.0, 450.0
+    sv_low["moveVx"], sv_low["moveVy"] = 0.0, 220.0
+    lx, ly = ZombieRoom._predict_target_pos(450.0, 450.0, sv_low, 325.0, lead_factor=0.7)
+    assert ly > sv_low["y"] + 40.0
+
+    # 4. Titan ở phòng 6 người tung nhiều vòng pháo kích hơn phòng 1 người (>= 5 vòng)
+    r6.zombies.clear()
+    r6.telegraphs.clear()
+    for idx, s in enumerate(r6.survivors.values()):
+        s["alive"] = True
+        s["downed"] = False
+        s["x"], s["y"] = 350.0 + idx * 140.0, 450.0
+    titan6 = r6._spawn_one_zombie("titan")
+    titan6["x"], titan6["y"] = 750.0, 220.0
+    titan6["specialCd"] = 0.0
+    r6.tick(dt_override=0.066)
+    assert len(r6.telegraphs) >= 5
+
+

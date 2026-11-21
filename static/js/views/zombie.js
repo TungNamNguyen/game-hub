@@ -108,7 +108,9 @@ function getAudio() {
   return audioCtx;
 }
 
-function playGunSfx(weapon) {
+function playGunSfx(weapon, gainScale = 1.0) {
+  const scale = clamp(Number.isFinite(gainScale) ? gainScale : 1.0, 0, 1);
+  if (scale < 0.03) return;
   const ctx = getAudio();
   if (!ctx) return;
   const now = ctx.currentTime;
@@ -119,7 +121,7 @@ function playGunSfx(weapon) {
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(weapon === 'tesla' ? 1280 : 920, now);
       osc.frequency.exponentialRampToValueAtTime(weapon === 'tesla' ? 220 : 110, now + 0.2);
-      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.setValueAtTime(Math.max(0.002, 0.12 * scale), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
       osc.connect(gain).connect(ctx.destination);
       osc.start(now);
@@ -132,7 +134,7 @@ function playGunSfx(weapon) {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(220, now);
       osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
-      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.setValueAtTime(Math.max(0.002, 0.18 * scale), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
       osc.connect(gain).connect(ctx.destination);
       osc.start(now);
@@ -149,15 +151,17 @@ function playGunSfx(weapon) {
     flt.type = weapon === 'flamer' ? 'bandpass' : 'lowpass';
     flt.frequency.value = weapon === 'shotgun' ? 900 : weapon === 'flamer' ? 500 : weapon === 'smg' ? 2200 : weapon === 'turret' ? 2600 : 1500;
     const gain = ctx.createGain();
-    const vol = weapon === 'shotgun' ? 0.16 : weapon === 'turret' ? 0.045 : 0.095;
-    gain.gain.setValueAtTime(vol, now);
+    const vol = (weapon === 'shotgun' ? 0.16 : weapon === 'turret' ? 0.045 : 0.095) * scale;
+    gain.gain.setValueAtTime(Math.max(0.002, vol), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
     src.connect(flt).connect(gain).connect(ctx.destination);
     src.start(now);
   } catch (_) {}
 }
 
-function playBoomSfx() {
+function playBoomSfx(gainScale = 1.0) {
+  const scale = clamp(Number.isFinite(gainScale) ? gainScale : 1.0, 0, 1);
+  if (scale < 0.03) return;
   const ctx = getAudio();
   if (!ctx) return;
   const now = ctx.currentTime;
@@ -173,7 +177,7 @@ function playBoomSfx() {
     flt.frequency.setValueAtTime(420, now);
     flt.frequency.exponentialRampToValueAtTime(70, now + dur);
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.setValueAtTime(Math.max(0.002, 0.22 * scale), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
     src.connect(flt).connect(gain).connect(ctx.destination);
     src.start(now);
@@ -365,6 +369,7 @@ export default {
     const shockwaves = [];
     const fireballs = [];
     let shakePower = 0;
+    let lastAllyGunSfxAt = 0;
 
     // Local input state
     const keys = new Set();
@@ -400,6 +405,7 @@ export default {
       lastWeaponsListKey = '';
       lastSquadKey = '';
       lastEventSeq = 0;
+      lastAllyGunSfxAt = 0;
       localDashEndMs = 0;
       localReloadEndMs = 0;
       mouseDown = false;
@@ -601,6 +607,45 @@ export default {
       if (decals.length > 70) decals.shift();
     }
 
+    function getListenerPos() {
+      const myMark = state?.you?.mark;
+      if (myMark) {
+        const pos = lerpSurv.get(myMark) || (state?.survivors || []).find((s) => s.mark === myMark);
+        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) return pos;
+      }
+      const aw = state?.arena?.w || 1600;
+      const ah = state?.arena?.h || 900;
+      return { x: aw * 0.5, y: ah * 0.5 };
+    }
+
+    function allyGunGain(x, y) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return 0.28;
+      const p = getListenerPos();
+      const d = Math.hypot(x - p.x, y - p.y);
+      const maxDist = 1150;
+      if (d >= maxDist) return 0;
+      const t = 1 - d / maxDist;
+      return 0.1 + 0.48 * t * t;
+    }
+
+    function boomGain(x, y) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return 0.85;
+      const p = getListenerPos();
+      const d = Math.hypot(x - p.x, y - p.y);
+      const t = clamp(1 - d / 1450, 0, 1);
+      return 0.42 + 0.58 * t;
+    }
+
+    function playAllyGunSfx(weapon, x, y) {
+      const g = allyGunGain(x, y);
+      if (g <= 0) return;
+      const nowMs = performance.now();
+      const minGap = (weapon === 'launcher' || weapon === 'railgun' || weapon === 'shotgun') ? 32 : 52;
+      if (nowMs - lastAllyGunSfxAt < minGap) return;
+      lastAllyGunSfxAt = nowMs;
+      playGunSfx(weapon, g);
+    }
+
     function ingestEvents(events) {
       if (!Array.isArray(events) || !events.length) return;
       if (events[events.length - 1].seq < lastEventSeq) lastEventSeq = 0;
@@ -629,13 +674,18 @@ export default {
             if (ev.weapon === 'shotgun' || ev.weapon === 'launcher') shakePower = Math.max(shakePower, 6.0);
             else if (ev.weapon === 'railgun') shakePower = Math.max(shakePower, 8.5);
             else if (ev.weapon === 'rifle') shakePower = Math.max(shakePower, 2.0);
-            playGunSfx(ev.weapon);
+            playGunSfx(ev.weapon, 1.0);
+          } else {
+            playAllyGunSfx(ev.weapon, ev.x, ev.y);
           }
         } else if (ev.t === 'chain') {
           chains.push({ pts: ev.pts || [], color: ev.color || '#60a5fa', life: 0.22, maxLife: 0.22 });
           if (ev.mark === state?.you?.mark) {
             shakePower = Math.max(shakePower, 3.2);
-            playGunSfx('tesla');
+            playGunSfx('tesla', 1.0);
+          } else {
+            const orig = ev.pts && ev.pts[0];
+            playAllyGunSfx('tesla', orig?.[0], orig?.[1]);
           }
         } else if (ev.t === 'hurt') {
           const ang = Math.atan2(ev.y - (ev.sy ?? ev.y), ev.x - (ev.sx ?? ev.x));
@@ -701,7 +751,7 @@ export default {
           }
           shockwaves.push({ x: ev.x, y: ev.y, r: 16, maxR: rad, color: isBarrel ? '#f97316' : '#fb923c', life: isBarrel ? 0.42 : 0.35, maxLife: isBarrel ? 0.42 : 0.35 });
           shakePower = Math.max(shakePower, isBarrel ? 14 : ev.t === 'boom' ? 11 : 6);
-          playBoomSfx();
+          playBoomSfx(boomGain(ev.x, ev.y));
         } else if (ev.t === 'barrel_hit') {
           addParticles(ev.x, ev.y, 9, '#fde047', 65, 210, 1.8, 3.8, 0.12, 0.28);
           addParticles(ev.x, ev.y, 5, '#fb923c', 40, 140, 2, 4.2, 0.15, 0.32);
@@ -709,16 +759,16 @@ export default {
           shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: ev.radius || 145, color: '#38bdf8', life: 0.42, maxLife: 0.42 });
           addParticles(ev.x, ev.y, 26, '#bae6fd', 50, 210, 2.5, 6, 0.25, 0.65);
           floatTexts.push({ x: ev.x, y: ev.y - 20, text: '❄️ ĐÓNG BĂNG!', color: '#7dd3fc', big: true, life: 0.9, maxLife: 0.9 });
-          playBoomSfx();
+          playBoomSfx(boomGain(ev.x, ev.y) * 0.85);
         } else if (ev.t === 'emp') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: ev.radius || 155, color: '#a78bfa', life: 0.4, maxLife: 0.4 });
           addParticles(ev.x, ev.y, 26, '#c4b5fd', 70, 260, 2, 5, 0.2, 0.5);
           floatTexts.push({ x: ev.x, y: ev.y - 20, text: '🌩️ CHOÁNG EMP!', color: '#c4b5fd', big: true, life: 0.95, maxLife: 0.95 });
-          playGunSfx('tesla');
+          playGunSfx('tesla', boomGain(ev.x, ev.y));
         } else if (ev.t === 'nuke') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 24, maxR: 620, color: '#fde047', life: 0.75, maxLife: 0.75 });
           shakePower = Math.max(shakePower, 16);
-          playBoomSfx();
+          playBoomSfx(1.0);
           toast('☢️ BOM HẠT NHÂN CHIẾN THUẬT ĐÃ KÍCH HOẠT!', 'ok');
         } else if (ev.t === 'turret_hit') {
           addParticles(ev.x, ev.y, 6, '#fbbf24', 50, 150, 2, 4, 0.15, 0.35);
@@ -728,7 +778,7 @@ export default {
           addParticles(ev.x, ev.y, 22, col, 90, 280, 3, 6.5, 0.22, 0.5);
           shockwaves.push({ x: ev.x, y: ev.y, r: 14, maxR: ev.radius || 110, color: col, life: 0.38, maxLife: 0.38 });
           shakePower = Math.max(shakePower, 9.5);
-          playBoomSfx();
+          playBoomSfx(boomGain(ev.x, ev.y));
         } else if (ev.t === 'acid') {
           shockwaves.push({ x: ev.x, y: ev.y, r: 12, maxR: ev.radius || 68, color: '#4ade80', life: 0.32, maxLife: 0.32 });
           addParticles(ev.x, ev.y, 14, '#86efac', 40, 150, 3, 5.5, 0.2, 0.45);

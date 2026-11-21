@@ -706,37 +706,68 @@ class ZombieRoom(SeatedRoom):
         self._begin_wave(1)
         self.system(f"🚨 Báo động Đêm Tử Thần! Đội {len(seated)} chiến binh đã triển khai tại {self.label}.")
 
-    def _build_wave_queue(self, wave: int) -> list[str]:
+    def _squad_scale(self) -> dict[str, float]:
+        """Hệ số cân bằng sức mạnh, số lượng & tốc độ ra chiêu của Zombie theo quy mô đội (1–6 người/bot)."""
         n_players = max(1, len(self.survivors))
+        extra = max(0, n_players - 1)
+        return {
+            "n_players": float(n_players),
+            "extra": float(extra),
+            "count_mult": 1.0 + extra * 0.34,          # 1p: 1.00x -> 6p: 2.70x số quái mỗi đợt
+            "hp_mult": 1.0 + extra * 0.16,             # 1p: 1.00x -> 6p: 1.80x HP quái thường
+            "mini_hp_mult": 1.0 + extra * 0.30,        # 1p: 1.00x -> 6p: 2.50x HP Mini-Boss
+            "boss_hp_mult": 1.0 + extra * 0.36,        # 1p: 1.00x -> 6p: 2.80x HP Boss/Titan
+            "dmg_mult": 1.0 + extra * 0.08,            # 1p: 1.00x -> 6p: 1.40x sát thương
+            "speed_mult": 1.0 + min(0.22, extra * 0.042),  # 1p: 1.00x -> 6p: 1.21x tốc độ
+            "cd_mult": max(0.62, 1.0 - extra * 0.07),  # 1p: 1.00x -> 6p: 0.65x hồi chiêu kỹ năng
+            "spawn_rate_mult": 1.0 + extra * 0.36,     # 1p: 1.00x -> 6p: 2.80x nhịp sinh quái
+        }
+
+    def _build_wave_queue(self, wave: int) -> list[str]:
+        sc = self._squad_scale()
+        n_players = int(sc["n_players"])
+        extra = int(sc["extra"])
         diff_mult = {"easy": 0.8, "normal": 1.0, "hard": 1.3}.get(self.config.get("difficulty", "normal"), 1.0)
-        total = int(round((8 + wave * 4 + (n_players - 1) * 3) * diff_mult))
+        base_total = 8 + wave * 4
+        total = int(round(base_total * sc["count_mult"] * diff_mult))
+        sp_boost = min(0.14, extra * 0.025)
         queue: list[str] = []
         for _ in range(total):
             r = self.rng.random()
-            if wave >= 4 and r < 0.11:
+            if wave >= 4 and r < 0.11 + sp_boost * 0.55:
                 queue.append("brute")
-            elif wave >= 3 and r < 0.24:
+            elif wave >= 3 and r < 0.24 + sp_boost * 0.85:
                 queue.append("spitter")
-            elif wave >= 2 and r < 0.38:
+            elif wave >= 2 and r < 0.38 + sp_boost:
                 queue.append("bloater")
-            elif wave >= 2 and r < 0.62:
+            elif (wave >= 2 or n_players >= 4) and r < (0.62 + sp_boost if wave >= 2 else 0.26 + sp_boost * 0.5):
                 queue.append("runner")
             else:
                 queue.append("walker")
 
-        # Mốc Boss & Mini-Boss rõ ràng:
+        # Mốc Boss & Mini-Boss rõ ràng, bổ sung hộ tống khi phòng đông (4–6 chiến binh):
         # - Đợt 5: Chúa Tể Đột Biến (boss)
         # - Đợt 10, 15, 20...: Bạo Chúa Hủy Diệt (titan)
         # - Đợt 3, 6, 8, 9, 12, 13, 14... (không trùng đợt Boss lớn): Mini-Boss Đao Đồ Tể (butcher) hoặc Mẫu Hậu Độc Dược (queen)
         if wave >= 10 and wave % 5 == 0:
             queue.append("titan")
-            if wave >= 15:
+            if wave >= 15 or n_players >= 5:
                 queue.append("butcher")
+            if n_players >= 6:
+                queue.append("queen")
         elif wave % 5 == 0:
             queue.append("boss")
+            if n_players >= 5:
+                queue.append("butcher")
+            elif n_players >= 4:
+                queue.append("brute")
         elif wave % 3 == 0 or (wave >= 8 and wave % 2 == 0):
             mini_kind = "butcher" if (wave % 2 == 1) else "queen"
             queue.append(mini_kind)
+            if n_players >= 5 and wave >= 6:
+                queue.append("queen" if mini_kind == "butcher" else "butcher")
+            elif n_players >= 4:
+                queue.append("brute")
 
         self.rng.shuffle(queue)
         return queue
@@ -811,15 +842,15 @@ class ZombieRoom(SeatedRoom):
 
     def _spawn_one_zombie(self, kind: str) -> dict:
         spec = ZOMBIE_SPECS[kind]
+        sc = self._squad_scale()
         diff_hp = {"easy": 0.82, "normal": 1.0, "hard": 1.28}.get(self.config.get("difficulty", "normal"), 1.0)
-        wave_scale = 1.0 + (self.wave - 1) * 0.12
-        player_scale = 1.0 + max(0, len(self.survivors) - 1) * 0.16
+        wave_scale = 1.0 + (self.wave - 1) * 0.13
         if kind in ("boss", "titan"):
-            hp = (spec["hp"] + self.wave * (220.0 if kind == "titan" else 180.0)) * diff_hp * player_scale
+            hp = (spec["hp"] + self.wave * (240.0 if kind == "titan" else 195.0)) * diff_hp * sc["boss_hp_mult"]
         elif kind in ("butcher", "queen"):
-            hp = (spec["hp"] + self.wave * 95.0) * diff_hp * (1.0 + max(0, len(self.survivors) - 1) * 0.14)
+            hp = (spec["hp"] + self.wave * 105.0) * diff_hp * sc["mini_hp_mult"]
         else:
-            hp = spec["hp"] * diff_hp * wave_scale
+            hp = spec["hp"] * diff_hp * wave_scale * sc["hp_mult"]
         # Sinh ở 4 rìa bản đồ, tránh spawn ngay sát người chơi đang đứng rìa (< 180px)
         pad = spec["radius"] + 16.0
         alive_svs = [sv for sv in self.survivors.values() if sv["alive"]]
@@ -842,8 +873,9 @@ class ZombieRoom(SeatedRoom):
             if min_d >= 180.0:
                 break
         x, y = _resolve_circle_obstacles(best_pos[0], best_pos[1], spec["radius"], self._obstacles())
+        z_id = self._next_id()
         z = {
-            "id": self._next_id(),
+            "id": z_id,
             "kind": kind,
             "x": x,
             "y": y,
@@ -851,13 +883,15 @@ class ZombieRoom(SeatedRoom):
             "vy": 0.0,
             "hp": hp,
             "maxHp": hp,
-            "speed": spec["speed"] * (1.0 + min(0.35, (self.wave - 1) * 0.025)),
+            "speed": spec["speed"] * (1.0 + min(0.38, (self.wave - 1) * 0.028)) * sc["speed_mult"],
             "radius": spec["radius"],
-            "dmg": spec["dmg"] * diff_hp,
+            "dmg": spec["dmg"] * diff_hp * sc["dmg_mult"],
             "reward": spec["reward"],
             "score": spec["score"],
             "atkCd": 0.0,
-            "specialCd": self.rng.uniform(1.8, 3.2),
+            "specialCd": self.rng.uniform(1.5, 2.8) * sc["cd_mult"],
+            "flankSide": 1.0 if (z_id % 2 == 0) else -1.0,
+            "flankStrength": self.rng.uniform(0.38, 0.72) if kind in ("runner", "walker") else 0.0,
             "chargeTimer": 0.0,
             "chargeVx": 0.0,
             "chargeVy": 0.0,
@@ -1688,6 +1722,55 @@ class ZombieRoom(SeatedRoom):
                 next_pickups.append(pk)
         self.pickups = next_pickups
 
+    @staticmethod
+    def _predict_target_pos(
+        zx: float, zy: float, sv: dict, proj_speed: float, lead_factor: float = 0.72
+    ) -> tuple[float, float]:
+        """Dự đoán vị trí đón đầu mục tiêu đang di chuyển để Spitter/Boss ngắm chuẩn hơn."""
+        d = _dist(zx, zy, sv["x"], sv["y"])
+        lead_t = min(0.55, d / max(120.0, proj_speed)) * lead_factor
+        px = _clamp(sv["x"] + sv.get("moveVx", 0.0) * lead_t, 36.0, ARENA_W - 36.0)
+        py = _clamp(sv["y"] + sv.get("moveVy", 0.0) * lead_t, 36.0, ARENA_H - 36.0)
+        return px, py
+
+    def _choose_zombie_target(self, z: dict, standing: list[dict], downed: list[dict]) -> dict:
+        """Chọn mục tiêu chiến thuật thay vì cả đàn cùng bám duy nhất 1 người gần nhất."""
+        if len(standing) == 1:
+            return standing[0]
+        kind = z["kind"]
+        zid = z["id"]
+
+        def _score(sv: dict) -> float:
+            d = _dist(z["x"], z["y"], sv["x"], sv["y"])
+            mult = 1.0
+            # Ưu tiên kết liễu người thấp máu (đặc biệt Runner / Butcher)
+            hp_ratio = sv["hp"] / max(1.0, sv["maxHp"])
+            if hp_ratio < 0.45:
+                mult *= 0.76 if kind in ("runner", "butcher") else 0.86
+            # Phá rối đồng đội đang chạy lại cứu người gục ngã!
+            if downed and any(_dist(sv["x"], sv["y"], dn["x"], dn["y"]) < 130.0 for dn in downed):
+                mult *= 0.80
+            # Săn người bị tách đàn / cô lập để tránh bị tập trung hỏa lực
+            nearby_mates = sum(
+                1 for o in standing
+                if o is not sv and _dist(sv["x"], sv["y"], o["x"], o["y"]) < 210.0
+            )
+            if nearby_mates == 0 and kind in ("runner", "butcher", "brute"):
+                mult *= 0.84
+            elif nearby_mates >= 2 and kind in ("bloater", "spitter", "queen"):
+                # Quái nổ độc / phun axit thích đánh vào cụm đông người
+                mult *= 0.85
+            # Phân tán nhẹ theo ID để đàn quái tự chia mũi tấn công trên nhiều người chơi
+            try:
+                mark_idx = int(sv["mark"])
+            except (TypeError, ValueError):
+                mark_idx = 0
+            if (zid + mark_idx) % len(standing) == 0:
+                mult *= 0.86
+            return d * mult
+
+        return min(standing, key=_score)
+
     # ---- Vòng lặp mô phỏng 15 Hz (Server Authoritative Tick) --------------- #
     def tick(self, dt_override: float | None = None) -> bool:
         if not self.in_progress():
@@ -1719,14 +1802,19 @@ class ZombieRoom(SeatedRoom):
         # 2. Cập nhật vị trí chiến binh, thay đạn, hào quang Medic, cứu đồng đội & nhặt đồ
         self._step_survivors_and_pickups(dt, now, obs, allow_fire=True)
 
-        # 3. Sinh thêm Zombie từ hàng đợi đợt hiện tại
-        max_active = min(44, 12 + self.wave * 2 + len(self.survivors) * 3)
+        # 3. Sinh thêm Zombie từ hàng đợi đợt hiện tại (scale mật độ & nhịp sinh theo số người chơi)
+        sc = self._squad_scale()
+        n_players = int(sc["n_players"])
+        max_active = min(68, 12 + self.wave * 2 + n_players * 6)
         if self.wave_remaining_to_spawn and len(self.zombies) < max_active:
             self.spawn_timer -= dt
             if self.spawn_timer <= 0:
-                kind = self.wave_remaining_to_spawn.pop(0)
-                self._spawn_one_zombie(kind)
-                self.spawn_timer = max(0.26, 1.05 - self.wave * 0.05)
+                burst = 2 if (n_players >= 4 and len(self.wave_remaining_to_spawn) >= 2 and len(self.zombies) + 1 < max_active) else 1
+                for _ in range(burst):
+                    kind = self.wave_remaining_to_spawn.pop(0)
+                    self._spawn_one_zombie(kind)
+                base_interval = max(0.28, 1.05 - self.wave * 0.05)
+                self.spawn_timer = max(0.14, base_interval / sc["spawn_rate_mult"])
 
         # 4. Cập nhật Trụ súng Sentry tự động (có HP & đạn)
         next_turrets: list[dict] = []
@@ -1971,8 +2059,12 @@ class ZombieRoom(SeatedRoom):
         self.hazards = next_hazards
         self.zombies = [z for z in self.zombies if z["hp"] > 0]
 
-        # 8. Cập nhật AI & Va chạm Zombie (bao gồm Mini-Boss, Final Boss, Stun/Slow & đánh Trụ súng)
+        # 8. Cập nhật AI & Va chạm Zombie (bọc sườn, bắn đón đầu, né Cryo, scale kỹ năng theo đội hình)
         standing = [sv for sv in self.survivors.values() if sv["alive"] and not sv["downed"]]
+        downed = [sv for sv in self.survivors.values() if sv["alive"] and sv["downed"]]
+        cryo_zones = [hz for hz in self.hazards if hz.get("kind") == "cryo"]
+        cd_mult = sc["cd_mult"]
+        dmg_mult = sc["dmg_mult"]
         for z in list(self.zombies):
             if z["hp"] <= 0:
                 continue
@@ -2001,7 +2093,7 @@ class ZombieRoom(SeatedRoom):
             if not standing:
                 z["vx"], z["vy"] = 0.0, 0.0
                 continue
-            target_sv = min(standing, key=lambda s: _dist(z["x"], z["y"], s["x"], s["y"]))
+            target_sv = self._choose_zombie_target(z, standing, downed)
             d_sv = _dist(z["x"], z["y"], target_sv["x"], target_sv["y"])
 
             # Kiểm tra xem có Trụ súng Sentry nào nằm sát đường hoặc rất gần -> Zombie lao vào đập Trụ!
@@ -2014,13 +2106,15 @@ class ZombieRoom(SeatedRoom):
                 if td < d_tr:
                     d_tr = td
                     target_turret = t
-            attacking_turret = target_turret is not None and d_tr < min(135.0, d_sv * 0.85)
+            turret_aggro_r = 165.0 if z["kind"] in ("runner", "brute", "butcher", "boss", "titan") else 140.0
+            attacking_turret = target_turret is not None and d_tr < min(turret_aggro_r, d_sv * 0.90)
             tx_pos = target_turret["x"] if attacking_turret else target_sv["x"]
             ty_pos = target_turret["y"] if attacking_turret else target_sv["y"]
             dx = tx_pos - z["x"]
             dy = ty_pos - z["y"]
             d = math.hypot(dx, dy) or 1.0
             nx_dir, ny_dir = dx / d, dy / d
+            has_los = not any(_segment_hits_rect(z["x"], z["y"], tx_pos, ty_pos, ob) is not None for ob in obs)
 
             # Trạng thái Cuồng Bạo (Enrage) của Bạo Chúa Titan khi máu < 50%
             if z["kind"] == "titan" and not z["enraged"] and z["hp"] <= z["maxHp"] * 0.5:
@@ -2031,129 +2125,213 @@ class ZombieRoom(SeatedRoom):
                 self._emit("slam", x=round(z["x"], 1), y=round(z["y"], 1), radius=150)
                 self.system("⚠️ Bạo Chúa Hủy Diệt đã kích hoạt trạng thái CUỒNG BẠO!")
 
-            # Kỹ năng đặc biệt theo chủng Zombie / Mini-Boss / Boss
+            # Kỹ năng đặc biệt theo chủng Zombie / Mini-Boss / Boss (có bắn đón đầu & scale theo số người)
             z["specialCd"] -= dt
-            if z["kind"] == "spitter" and 160.0 <= d <= 420.0 and z["specialCd"] <= 0:
-                z["specialCd"] = self.rng.uniform(2.6, 3.8)
-                self.projectiles.append({
-                    "id": self._next_id(),
-                    "kind": "acid",
-                    "x": z["x"],
-                    "y": z["y"],
-                    "vx": nx_dir * 310.0,
-                    "vy": ny_dir * 310.0,
-                    "dmg": z["dmg"],
-                    "ttl": 1.6,
-                })
-            elif z["kind"] == "butcher" and d <= 260.0 and z["specialCd"] <= 0:
-                z["specialCd"] = 4.0
-                z["chargeTimer"] = 0.45
-                z["chargeVx"] = nx_dir * 340.0
-                z["chargeVy"] = ny_dir * 340.0
+            if z["kind"] == "spitter" and 140.0 <= d <= 450.0 and has_los and z["specialCd"] <= 0:
+                z["specialCd"] = self.rng.uniform(2.3, 3.4) * cd_mult
+                if attacking_turret:
+                    lead_x, lead_y = tx_pos, ty_pos
+                else:
+                    lead_x, lead_y = self._predict_target_pos(z["x"], z["y"], target_sv, 325.0, lead_factor=0.68)
+                base_a = math.atan2(lead_y - z["y"], lead_x - z["x"])
+                # Khi phòng đông (>= 4 người) ở wave >= 4: phun chùm 2-3 tia axit quạt hẹp!
+                offsets = (-0.16, 0.0, 0.16) if (n_players >= 4 and self.wave >= 4) else (0.0,)
+                for off in offsets:
+                    ang = base_a + off
+                    self.projectiles.append({
+                        "id": self._next_id(),
+                        "kind": "acid",
+                        "x": z["x"],
+                        "y": z["y"],
+                        "vx": math.cos(ang) * 325.0,
+                        "vy": math.sin(ang) * 325.0,
+                        "dmg": z["dmg"],
+                        "ttl": 1.65,
+                        "spawnAcid": (off == 0.0 and n_players >= 3),
+                    })
+            elif z["kind"] == "butcher" and d <= 290.0 and z["specialCd"] <= 0:
+                z["specialCd"] = 3.8 * cd_mult
+                if attacking_turret:
+                    lead_x, lead_y = tx_pos, ty_pos
+                else:
+                    lead_x, lead_y = self._predict_target_pos(z["x"], z["y"], target_sv, 355.0, lead_factor=0.72)
+                ldx, ldy = lead_x - z["x"], lead_y - z["y"]
+                ld = math.hypot(ldx, ldy) or 1.0
+                lnx, lny = ldx / ld, ldy / ld
+                z["chargeTimer"] = 0.48
+                z["chargeVx"] = lnx * 355.0
+                z["chargeVy"] = lny * 355.0
                 z["skillLabel"] = "CHÉM XOÁY ĐỊA CHẤN"
                 z["skillLabelUntil"] = now + 1.5
-                tx = _clamp(z["x"] + nx_dir * min(d, 110.0), 60.0, ARENA_W - 60.0)
-                ty = _clamp(z["y"] + ny_dir * min(d, 110.0), 60.0, ARENA_H - 60.0)
+                tx = _clamp(z["x"] + lnx * min(ld, 125.0), 60.0, ARENA_W - 60.0)
+                ty = _clamp(z["y"] + lny * min(ld, 125.0), 60.0, ARENA_H - 60.0)
                 self.telegraphs.append({
                     "id": self._next_id(),
                     "kind": "slam",
                     "x": tx,
                     "y": ty,
-                    "radius": 115.0,
+                    "radius": 115.0 + min(24.0, (n_players - 1) * 5.0),
                     "t": 0.0,
-                    "dur": 0.65,
-                    "dmg": 34.0,
+                    "dur": max(0.52, 0.65 - (n_players - 1) * 0.025),
+                    "dmg": 34.0 * dmg_mult,
                 })
-            elif z["kind"] == "queen" and 110.0 <= d <= 520.0 and z["specialCd"] <= 0:
-                z["specialCd"] = 4.2
+            elif z["kind"] == "queen" and 110.0 <= d <= 540.0 and z["specialCd"] <= 0:
+                z["specialCd"] = 4.0 * cd_mult
                 z["skillLabel"] = "MƯA AXIT ĐỘC"
                 z["skillLabelUntil"] = now + 1.5
-                base_a = math.atan2(dy, dx)
-                for offset in (-0.42, -0.21, 0.0, 0.21, 0.42):
+                if attacking_turret:
+                    lead_x, lead_y = tx_pos, ty_pos
+                else:
+                    lead_x, lead_y = self._predict_target_pos(z["x"], z["y"], target_sv, 305.0, lead_factor=0.75)
+                base_a = math.atan2(lead_y - z["y"], lead_x - z["x"])
+                fan = (-0.54, -0.36, -0.18, 0.0, 0.18, 0.36, 0.54) if n_players >= 5 else (-0.42, -0.21, 0.0, 0.21, 0.42)
+                for offset in fan:
                     ang = base_a + offset
                     self.projectiles.append({
                         "id": self._next_id(),
                         "kind": "acid",
                         "x": z["x"],
                         "y": z["y"],
-                        "vx": math.cos(ang) * 290.0,
-                        "vy": math.sin(ang) * 290.0,
-                        "dmg": 18.0,
-                        "ttl": 1.35,
-                        "spawnAcid": (offset == 0.0),
+                        "vx": math.cos(ang) * 305.0,
+                        "vy": math.sin(ang) * 305.0,
+                        "dmg": 18.0 * dmg_mult,
+                        "ttl": 1.4,
+                        "spawnAcid": (abs(offset) <= 0.22 if n_players >= 4 else offset == 0.0),
                     })
-                if len(self.zombies) < 38:
-                    self._spawn_one_zombie("runner")
-                    self._spawn_one_zombie("runner")
-            elif z["kind"] in ("brute", "boss") and 95.0 <= d <= 380.0 and z["specialCd"] <= 0:
-                z["specialCd"] = 4.8 if z["kind"] == "brute" else 4.2
+                summon_cnt = min(4, 2 + (n_players - 1) // 2)
+                for _ in range(summon_cnt):
+                    if len(self.zombies) < max_active:
+                        self._spawn_one_zombie("runner")
+            elif z["kind"] in ("brute", "boss") and 95.0 <= d <= 400.0 and z["specialCd"] <= 0:
+                z["specialCd"] = (4.6 if z["kind"] == "brute" else 4.0) * cd_mult
+                spd_charge = (345.0 if z["kind"] == "brute" else 330.0) * sc["speed_mult"]
+                if attacking_turret:
+                    lead_x, lead_y = tx_pos, ty_pos
+                else:
+                    lead_x, lead_y = self._predict_target_pos(z["x"], z["y"], target_sv, spd_charge, lead_factor=0.65)
+                ldx, ldy = lead_x - z["x"], lead_y - z["y"]
+                ld = math.hypot(ldx, ldy) or 1.0
                 z["chargeTimer"] = 0.65
-                spd_charge = 330.0 if z["kind"] == "brute" else 315.0
-                z["chargeVx"] = nx_dir * spd_charge
-                z["chargeVy"] = ny_dir * spd_charge
+                z["chargeVx"] = (ldx / ld) * spd_charge
+                z["chargeVy"] = (ldy / ld) * spd_charge
                 if z["kind"] == "boss":
                     z["skillLabel"] = "HÚC ĐỊA CHẤN & VÒNG ĐỘC"
                     z["skillLabelUntil"] = now + 1.8
-                    for k in range(8):
-                        ang = (math.tau / 8.0) * k
+                    ring_n = 8 + min(4, max(0, n_players - 2))
+                    for k in range(ring_n):
+                        ang = (math.tau / ring_n) * k
                         self.projectiles.append({
                             "id": self._next_id(),
                             "kind": "acid",
                             "x": z["x"],
                             "y": z["y"],
-                            "vx": math.cos(ang) * 255.0,
-                            "vy": math.sin(ang) * 255.0,
-                            "dmg": 16.0,
-                            "ttl": 1.9,
+                            "vx": math.cos(ang) * 265.0,
+                            "vy": math.sin(ang) * 265.0,
+                            "dmg": 16.0 * dmg_mult,
+                            "ttl": 1.95,
                         })
-                    if len(self.zombies) < 40:
-                        self._spawn_one_zombie("runner")
-                        self._spawn_one_zombie("runner")
+                    # Khi đội >= 3 người, Boss gọi thêm địa chấn đón đầu vào vị trí đồng đội
+                    if n_players >= 3:
+                        slam_targets = list(standing)
+                        self.rng.shuffle(slam_targets)
+                        for st in slam_targets[:min(2, len(slam_targets))]:
+                            px, py = self._predict_target_pos(z["x"], z["y"], st, 220.0, lead_factor=0.6)
+                            self.telegraphs.append({
+                                "id": self._next_id(),
+                                "kind": "slam",
+                                "x": px,
+                                "y": py,
+                                "radius": 92.0,
+                                "t": 0.0,
+                                "dur": 0.95,
+                                "dmg": 32.0 * dmg_mult,
+                            })
+                    summon_cnt = min(4, 2 + (n_players - 1) // 2)
+                    for _ in range(summon_cnt):
+                        if len(self.zombies) < max_active:
+                            self._spawn_one_zombie("runner")
             elif z["kind"] == "titan" and z["specialCd"] <= 0:
-                z["specialCd"] = 3.2 if z["enraged"] else 4.4
+                z["specialCd"] = (3.1 if z["enraged"] else 4.2) * cd_mult
                 z["skillLabel"] = "PHÁO KÍCH NHIỆT HẠCH"
                 z["skillLabelUntil"] = now + 2.0
                 targets = list(standing)
                 self.rng.shuffle(targets)
-                for idx_t in range(min(3, max(2, len(targets)))):
+                # Số vòng pháo kích scale trực tiếp theo số lượng chiến binh (tối đa 6 vòng cho đội 6 người)
+                salvo = min(6, max(2, len(targets) + (1 if z["enraged"] else 0)))
+                for idx_t in range(salvo):
                     tsv = targets[idx_t % len(targets)]
-                    ox = self.rng.uniform(-42.0, 42.0) if idx_t >= len(targets) else 0.0
-                    oy = self.rng.uniform(-42.0, 42.0) if idx_t >= len(targets) else 0.0
+                    px, py = self._predict_target_pos(z["x"], z["y"], tsv, 240.0, lead_factor=0.72)
+                    ox = self.rng.uniform(-44.0, 44.0) if idx_t >= len(targets) else 0.0
+                    oy = self.rng.uniform(-44.0, 44.0) if idx_t >= len(targets) else 0.0
                     self.telegraphs.append({
                         "id": self._next_id(),
                         "kind": "orbital",
-                        "x": _clamp(tsv["x"] + ox, 50.0, ARENA_W - 50.0),
-                        "y": _clamp(tsv["y"] + oy, 50.0, ARENA_H - 50.0),
-                        "radius": 88.0,
+                        "x": _clamp(px + ox, 50.0, ARENA_W - 50.0),
+                        "y": _clamp(py + oy, 50.0, ARENA_H - 50.0),
+                        "radius": 90.0,
                         "t": 0.0,
-                        "dur": 1.05 if z["enraged"] else 1.2,
-                        "dmg": 42.0,
+                        "dur": max(0.85, (1.02 if z["enraged"] else 1.18) - (n_players - 1) * 0.02),
+                        "dmg": 42.0 * dmg_mult,
                     })
                 if z["enraged"]:
-                    for k in range(12):
-                        ang = (math.tau / 12.0) * k + (now % 1.0)
+                    ring_n = 12 + min(4, max(0, n_players - 2))
+                    for k in range(ring_n):
+                        ang = (math.tau / ring_n) * k + (now % 1.0)
                         self.projectiles.append({
                             "id": self._next_id(),
                             "kind": "plasma",
                             "x": z["x"],
                             "y": z["y"],
-                            "vx": math.cos(ang) * 285.0,
-                            "vy": math.sin(ang) * 285.0,
-                            "dmg": 20.0,
+                            "vx": math.cos(ang) * 295.0,
+                            "vy": math.sin(ang) * 295.0,
+                            "dmg": 20.0 * dmg_mult,
                             "ttl": 2.0,
                         })
 
             slow_mult = 0.35 if z["slowTimer"] > 0 else 1.0
+            eff_speed = z["speed"] * slow_mult
+            # Bloater khi còn < 45% máu sẽ tăng tốc lao vào nổ sát đội hình!
+            if z["kind"] == "bloater" and z["hp"] < z["maxHp"] * 0.45:
+                eff_speed *= 1.35
+
             if z["chargeTimer"] > 0:
                 z["chargeTimer"] -= dt
                 mvx, mvy = z["chargeVx"] * slow_mult, z["chargeVy"] * slow_mult
-            elif z["kind"] in ("spitter", "queen") and d < 220.0:
-                mvx, mvy = -nx_dir * z["speed"] * 0.55 * slow_mult, -ny_dir * z["speed"] * 0.55 * slow_mult
+            elif z["kind"] in ("spitter", "queen") and has_los and d < 235.0:
+                # Kiting chéo (lùi kết hợp di chuyển ngang để né đạn)
+                fside = z.get("flankSide", 1.0)
+                kx = -nx_dir * 0.72 + (-ny_dir * fside) * 0.68
+                ky = -ny_dir * 0.72 + (nx_dir * fside) * 0.68
+                km = math.hypot(kx, ky) or 1.0
+                mvx, mvy = (kx / km) * eff_speed * 0.72, (ky / km) * eff_speed * 0.72
+            elif z["kind"] in ("spitter", "queen") and has_los and 235.0 <= d <= 360.0:
+                # Ở tầm bắn lý tưởng: di chuyển vòng ngang (strafe) gây khó cho xạ thủ
+                fside = z.get("flankSide", 1.0)
+                mvx, mvy = (-ny_dir * fside) * eff_speed * 0.58, (nx_dir * fside) * eff_speed * 0.58
             else:
                 steer_x, steer_y = _steer_around_obstacles(z["x"], z["y"], tx_pos, ty_pos, z["radius"], obs)
-                mvx, mvy = steer_x * z["speed"] * slow_mult, steer_y * z["speed"] * slow_mult
+                # Chiến thuật bọc sườn (flanking): Runner & một phần Walker vòng 2 cánh bao vây thay vì đi 1 hàng thẳng
+                flank_str = z.get("flankStrength", 0.0)
+                if flank_str > 0.0 and 105.0 < d < 420.0:
+                    fside = z.get("flankSide", 1.0)
+                    blend = flank_str * min(1.0, (d - 105.0) / 170.0)
+                    px_f, py_f = -steer_y * fside, steer_x * fside
+                    steer_x += px_f * blend
+                    steer_y += py_f * blend
+                # Né vũng bão băng Cryo nếu còn đường vòng
+                if cryo_zones:
+                    for cz in cryo_zones:
+                        cdx, cdy = z["x"] - cz["x"], z["y"] - cz["y"]
+                        cd = math.hypot(cdx, cdy) or 1.0
+                        avoid_r = cz["radius"] + z["radius"] + 28.0
+                        if cd < avoid_r:
+                            cw = (avoid_r - cd) / avoid_r
+                            steer_x += (cdx / cd) * cw * 1.45
+                            steer_y += (cdy / cd) * cw * 1.45
+                sm = math.hypot(steer_x, steer_y) or 1.0
+                mvx, mvy = (steer_x / sm) * eff_speed, (steer_y / sm) * eff_speed
                 if z["kind"] == "runner":
-                    wobble = math.sin(now * 7.0 + z["id"]) * 0.35
+                    wobble = math.sin(now * 7.0 + z["id"]) * 0.28
                     mvx, mvy = (
                         mvx * math.cos(wobble) - mvy * math.sin(wobble),
                         mvx * math.sin(wobble) + mvy * math.cos(wobble),
