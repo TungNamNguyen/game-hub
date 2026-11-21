@@ -418,3 +418,115 @@ def test_rejects_gen1_lowres_black_panoramas():
     ]
     assert _is_valid_sv_resolution(gen3_node) is True
     assert _is_valid_sv_resolution(gen4_node) is True
+
+
+def test_world_continent_budgets_and_au_nz_ratio():
+    from geoguessr import (
+        WORLD_CONTINENT_BUDGETS,
+        _CONTINENT_BOX_WEIGHTS,
+        _NA_HAWAII_BOX,
+        _WORLD_BOX_WEIGHTS,
+        sv_client_config,
+    )
+
+    world_boxes = STREETVIEW_LAND_BOXES["world"]
+    # Khung Hawaii ở north_america không bị nhân đôi vào world (vì oceania đã có 6 đảo Hawaii)
+    assert _NA_HAWAII_BOX in STREETVIEW_LAND_BOXES["north_america"]
+    assert _NA_HAWAII_BOX not in world_boxes
+
+    # Mọi khung ở 5 châu lục phải có trọng số nội bộ dương
+    for cont in ("europe", "asia", "north_america", "south_america", "africa"):
+        for b in STREETVIEW_LAND_BOXES[cont]:
+            assert _CONTINENT_BOX_WEIGHTS.get(b, 0.0) > 0.0
+
+    # Tổng trọng số từng châu lục trong world phải khớp tuyệt đối WORLD_CONTINENT_BUDGETS
+    total_w = sum(_WORLD_BOX_WEIGHTS[b] for b in world_boxes)
+    assert abs(total_w - 100.0) < 1e-6
+
+    cfg_world = sv_client_config()["modes"]["world"]["boxes"]
+    cfg_by_box = {(r[0], r[1], r[2], r[3]): r[5] for r in cfg_world}
+    assert len(cfg_world) == len(world_boxes)
+
+    for cont, target_pct in WORLD_CONTINENT_BUDGETS.items():
+        c_boxes = [
+            b for b in STREETVIEW_LAND_BOXES[cont]
+            if not (cont == "north_america" and b == _NA_HAWAII_BOX)
+        ]
+        server_pct = sum(_WORLD_BOX_WEIGHTS[b] for b in c_boxes)
+        client_pct = sum(cfg_by_box[b] for b in c_boxes)
+        assert abs(server_pct - target_pct) < 1e-5, f"{cont}: expected {target_pct}, got {server_pct}"
+        assert abs(client_pct - target_pct) < 0.02, f"client {cont}: expected {target_pct}, got {client_pct}"
+
+    # Tỷ trọng AU + NZ trong world giảm về ~6.5% (trong khoảng 5.5% - 7.5%), không còn bị lệch ~20%
+    au_nz_pct = sum(
+        _WORLD_BOX_WEIGHTS[b]
+        for b in world_boxes
+        if STREETVIEW_BOX_META.get(b, ("",))[0] in ("AU", "NZ")
+    )
+    assert 5.5 <= au_nz_pct <= 7.5, f"Expected world AU+NZ in [5.5%, 7.5%], got {au_nz_pct:.2f}%"
+
+
+def test_russia_boxes_and_country_validation():
+    from geoguessr import COUNTRY_GEO_INFO, is_valid_country_for_mode
+
+    assert is_valid_country_for_mode("europe", "RU") is True
+    assert is_valid_country_for_mode("asia", "RU") is True
+    assert is_valid_country_for_mode("world", "RU") is True
+    assert "Nga" in COUNTRY_GEO_INFO
+
+    # Có ít nhất 2 khung Nga thuộc châu Âu và 2 khung Siberia thuộc châu Á
+    assert (54.5, 60.2, 29.8, 44.5) in STREETVIEW_LAND_BOXES["europe"]
+    assert (52.0, 57.0, 60.0, 86.5) in STREETVIEW_LAND_BOXES["asia"]
+    assert (54.5, 60.2, 29.8, 44.5) in STREETVIEW_LAND_BOXES["world"]
+    assert (52.0, 57.0, 60.0, 86.5) in STREETVIEW_LAND_BOXES["world"]
+
+    moscow = enrich_location_metadata(
+        {"lat": 55.7558, "lng": 37.6173, "name": "Tverskaya St", "country": "Nga", "cc": "RU"},
+        "europe",
+    )
+    assert moscow["country"] == "Nga"
+    assert moscow["meta"]["sovereign"] == "Quốc gia Độc lập"
+    assert "Đông Âu" in moscow["meta"]["subregion"]
+
+
+def test_cache_draw_avoids_consecutive_country_and_vn_province():
+    # 1. Chế độ world: tránh bốc lặp cùng 1 quốc gia liên tiếp từ cache
+    world_room = GeoRoom("ANTI", "world")
+    world_room.join("u1", "Tester", "#38bdf8")
+    world_room.session_recent_regions = ["AU"]
+
+    with _DYNAMIC_SV_LOCK:
+        saved_world = list(_DYNAMIC_SV_CACHE.get("world", []))
+        _DYNAMIC_SV_CACHE["world"] = [
+            {"lat": -33.86, "lng": 151.21, "heading": 0, "pano": "AAAAAAAAAAAAAAAAAAAAAA", "name": "Sydney", "country": "Úc", "cc": "AU"},
+            {"lat": 55.75, "lng": 37.61, "heading": 90, "pano": "BBBBBBBBBBBBBBBBBBBBBB", "name": "Moscow", "country": "Nga", "cc": "RU"},
+        ]
+    try:
+        with mock.patch("geoguessr.warm_dynamic_sv_cache"):
+            drawn = world_room._draw_location(set(), allow_live_fetch=False)
+        assert drawn["cc"] == "RU"
+        assert world_room.session_recent_regions[-1] == "RU"
+    finally:
+        with _DYNAMIC_SV_LOCK:
+            _DYNAMIC_SV_CACHE["world"] = saved_world
+
+    # 2. Chế độ vietnam: tránh bốc lặp cùng 1 tỉnh/thành liên tiếp từ cache
+    vn_room = GeoRoom("VNAV", "vietnam")
+    vn_room.join("u1", "TesterVN", "#38bdf8")
+    hn_loc = {"lat": 21.028, "lng": 105.854, "heading": 0, "pano": "CCCCCCCCCCCCCCCCCCCCCC", "name": "Hoàn Kiếm, Hà Nội", "country": "Việt Nam", "cc": "VN"}
+    hcm_loc = {"lat": 10.776, "lng": 106.700, "heading": 0, "pano": "DDDDDDDDDDDDDDDDDDDDDD", "name": "Quận 1, TP.HCM", "country": "Việt Nam", "cc": "VN"}
+    vn_room._record_recent_region(hn_loc)
+
+    with _DYNAMIC_SV_LOCK:
+        saved_vn = list(_DYNAMIC_SV_CACHE.get("vietnam", []))
+        _DYNAMIC_SV_CACHE["vietnam"] = [
+            {**hn_loc, "lat": 21.031, "lng": 105.850},  # cùng khung Hà Nội
+            hcm_loc,                                    # khung TP.HCM
+        ]
+    try:
+        with mock.patch("geoguessr.warm_dynamic_sv_cache"):
+            drawn_vn = vn_room._draw_location(set(), allow_live_fetch=False)
+        assert abs(drawn_vn["lat"] - 10.776) < 0.01
+    finally:
+        with _DYNAMIC_SV_LOCK:
+            _DYNAMIC_SV_CACHE["vietnam"] = saved_vn
