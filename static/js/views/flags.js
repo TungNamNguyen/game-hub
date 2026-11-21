@@ -180,17 +180,22 @@ export default {
 
     let activeTypeInput = null;
 
-    function submitChoiceOptimistic(code) {
-      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice) return;
-      pendingChoice = code;
+    function optionChoiceKey(opt, idx) {
+      return String(opt && opt.idx !== undefined ? opt.idx : (opt?.code ?? idx));
+    }
+
+    function submitChoiceOptimistic(choiceKey) {
+      const key = String(choiceKey ?? '');
+      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice !== '') return;
+      pendingChoice = key;
       pendingQuestionIdx = state.question?.index ?? -1;
       optimisticPlayed = true;
       sfx.move();
       for (const entry of activeChoiceButtons) {
         entry.btn.disabled = true;
-        entry.btn.classList.toggle('pending', entry.code === code);
+        entry.btn.classList.toggle('pending', entry.code === key);
       }
-      send('answer', { choice: code });
+      send('answer', { choice: key });
     }
 
     function renderQuestion() {
@@ -244,18 +249,19 @@ export default {
             ? t('flags.lockedSkip')
             : t('flags.lockedWrong')));
       } else if ((cfg.answerMode || 'choice') === 'choice') {
-        const isPendingHere = pendingChoice && pendingQuestionIdx === q.index;
+        const isPendingHere = pendingChoice !== '' && pendingQuestionIdx === q.index;
         const grid = h('div', { class: 'flags-options-grid' },
           (q.options || []).map((opt, idx) => {
+            const key = optionChoiceKey(opt, idx);
             const btn = h('button', {
               type: 'button',
-              class: 'flags-opt-btn' + (isPendingHere && pendingChoice === opt.code ? ' pending' : ''),
+              class: 'flags-opt-btn' + (isPendingHere && pendingChoice === key ? ' pending' : ''),
               disabled: Boolean(isPendingHere),
-              onclick: () => submitChoiceOptimistic(opt.code),
+              onclick: () => submitChoiceOptimistic(key),
             },
               h('span', { class: 'flags-opt-key' }, String(idx + 1)),
               h('span', { class: 'flags-opt-label' }, primaryLabel(opt)));
-            activeChoiceButtons.push({ code: opt.code, btn });
+            activeChoiceButtons.push({ code: key, btn });
             return btn;
           }));
         stageBody.append(grid, h('div', { class: 'tiny muted', style: { textAlign: 'center' } }, t('flags.hotkeyHint')));
@@ -493,14 +499,14 @@ export default {
     }
 
     const onKeyDown = (event) => {
-      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice) return;
+      if (!state || state.phase !== 'question' || state.myAnswer || pendingChoice !== '') return;
       const tag = (event.target?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea') return;
       if ((state.config?.answerMode || 'choice') !== 'choice') return;
       const idx = ['1', '2', '3', '4'].indexOf(event.key);
       if (idx >= 0 && state.question?.options?.[idx]) {
         event.preventDefault();
-        submitChoiceOptimistic(state.question.options[idx].code);
+        submitChoiceOptimistic(optionChoiceKey(state.question.options[idx], idx));
       }
     };
     document.addEventListener('keydown', onKeyDown);
