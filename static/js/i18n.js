@@ -858,7 +858,7 @@ export const DICTS = {
 
     // Zombie Outbreak (Đêm Tử Thần)
     'zombie.title': 'Đêm Tử Thần',
-    'zombie.blurb': 'Bắn súng sinh tồn Zombie Co-op 1–6 người & AI Bots: 7 vũ khí nâng cấp Mk.I–III, 4 lớp Chiến Binh, Mini-Boss & Boss Đột Biến, Trụ súng Sentry!',
+    'zombie.blurb': 'Bắn súng sinh tồn Zombie Co-op 1–6 người & AI Bots: 8 vũ khí nâng cấp Mk.I–III, 9 chủng quái, 4 lớp Chiến Binh, Mini-Boss & Boss Đột Biến, Trụ súng Sentry!',
     'zombie.cfgTitle': 'Cấu hình Chiến dịch',
     'zombie.cfgMap': 'Bản đồ',
     'zombie.cfgDiff': 'Độ khó',
@@ -1724,7 +1724,7 @@ export const DICTS = {
 
     // Zombie Outbreak
     'zombie.title': 'Zombie Outbreak',
-    'zombie.blurb': '1–6 player Co-op Survival Shooter with AI Bots: 7 upgradable weapons (Mk.I–III), 4 Survivor classes, Mini-Bosses & Bosses, Sentry Turrets & Team Revives!',
+    'zombie.blurb': '1–6 player Co-op Survival Shooter with AI Bots: 8 upgradable weapons (Mk.I–III), 9 zombie types, 4 Survivor classes, Mini-Bosses & Bosses, Sentry Turrets & Team Revives!',
     'zombie.cfgTitle': 'Mission Setup',
     'zombie.cfgMap': 'Arena Map',
     'zombie.cfgDiff': 'Difficulty',
@@ -1848,8 +1848,8 @@ const APP_META = {
     en: ['Ludo (Cá Ngựa)', '4-player Aeroplane Chess with Blocking, Backward Kick & Home Climb'],
   },
   zombie: {
-    vi: ['Đêm Tử Thần', 'Bắn súng sinh tồn Zombie Co-op 1–6 người, 7 vũ khí Mk.III, Mini-Boss & Boss'],
-    en: ['Zombie Outbreak', '1–6p Co-op Top-Down Zombie Shooter with 7 Upgradable Weapons, Mini-Bosses & Bosses'],
+    vi: ['Đêm Tử Thần', 'Bắn súng sinh tồn Zombie Co-op 1–6 người, 8 vũ khí Mk.III, 9 chủng quái, Mini-Boss & Boss'],
+    en: ['Zombie Outbreak', '1–6p Co-op Top-Down Zombie Shooter with 8 Upgradable Weapons, 9 Zombie Types, Mini-Bosses & Bosses'],
   },
   faces: {
     vi: ['Tạo avatar', 'Bấm một nút ra một mặt người mới, dùng làm ảnh đại diện'],
