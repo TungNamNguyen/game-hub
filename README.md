@@ -2,18 +2,18 @@
 
 A modern, lightweight, full-stack web platform for **real-time multiplayer games, group chat, and custom avatars**, built with **FastAPI**, **WebSockets + SSE/Long-Polling fallback**, **PostgreSQL / JSON storage**, and **Vanilla ES6 Modules** (zero frontend build step required).
 
-Supports instant play without account registration, **16 dark/light themes**, **full Vietnamese / English (VI/EN) localization**, **desktop & mobile responsive layouts**, and **AI bots** across 7 game modes.
+Supports instant play without account registration, **16 dark/light themes**, **full Vietnamese / English (VI/EN) localization**, **desktop & mobile responsive layouts**, and **AI bots across all 10 games**.
 
 ---
 
 ## 🌟 Games & Apps
 
 ### 🌍 1. GeoGuessr (Địa Đồ)
-- **8 Map Regions**: **World**, **Vietnam (63 provinces)**, **Asia**, **Europe**, **North America**, **South America**, **Africa**, and **Oceania**.
+- **8 Map Regions**: **World** *(continent-balanced 30% Europe / 22% Asia / 16% North America / 14% South America / 10% Africa / 8% Oceania, including Russia)*, **Vietnam (63 provinces)**, **Asia**, **Europe**, **North America**, **South America**, **Africa**, and **Oceania**.
 - **2 Modes**:
-  - **Global (100% Street View)**: Real-time worldwide Google Street View with background RAM pre-warming (`0ms` round start) and strict ISO country-code boundary validation.
+  - **Global (100% Street View)**: Real-time worldwide Google Street View with background RAM pre-warming (`0ms` round start), browser Street View feed fallback when outbound RPC is blocked, consecutive country/province cooldown, and strict ISO country-code boundary validation.
   - **Landmarks**: Curated & verified collection of **1,600+ official 22-character `pano` ID** locations across all regions (zero black screens).
-- **3 Formats & 3 Rules**: Classic 5-Round, Country/Province Streak, and Team/Boss Survival Duels (`6,000` / `12,000` HP); **Moving**, **No Move (NM)**, and **NMPZ**.
+- **3 Formats & 3 Rules**: Classic (5/10/15/20 rounds), Country/Province Streak, and Team/Boss Survival Duels (`6,000` / `12,000` HP); **Moving**, **No Move (NM)**, and **NMPZ**.
 
 ### 🏳️ 2. Flags & Capitals (Đố Cờ & Thủ Đô)
 - **197 Countries & Territories** filtered by **World**, **Asia**, **Europe**, **Americas**, **Africa**, or **Oceania**.
@@ -23,13 +23,21 @@ Supports instant play without account registration, **16 dark/light themes**, **
   - **Type Answer**: Accent-insensitive VI/EN/alias matching (e.g. `viet nam` / `Việt Nam`, `ha noi` / `Hanoi`, `USA` / `Mỹ`), 1-typo tolerance, and quick autocomplete suggestions.
 - **Multiplayer & AI Bots**: 1–6 players with speed + streak scoring and 3 AI bot difficulty levels.
 
-### 🃏 3. Liar's Deck (Sòng Bịp)
+### 🧟 3. Zombie Survival (Đại Chiến Zombie)
+- **1–6 Player Co-op Top-Down Shooter** running on a **15 Hz server-authoritative tick** with delta state synchronization and twin-stick touch controls for mobile.
+- **6 Maps**: **Outpost** (10 waves), **Metro** (12 waves), **Dock** (12 waves), **Lab** (15 waves), **Reactor** (15 waves), and **Endless**.
+- **4 Classes, 8 Weapons & 9 Enemy Types**: Assault, Medic, Engineer, and Vanguard classes; shop intermissions (`16s`), deployable turrets/CC gadgets, explosive barrels, boss waves, and AI bots (including disconnect bot proxy).
+
+### 🃏 4. Liar's Deck (Sòng Bịp)
 - 2–4 player bluffing card game with **Devil Mode (Ma Vương)**, Colt Python .357 Russian roulette animations & sound effects, quick taunt bubbles, synced player avatars, and AI bots.
 
-### ♠️ 4. Texas Hold'em Poker (Xì Tố)
+### ♠️ 5. Texas Hold'em Poker (Xì Tố)
 - 2–6 players **Cash** & **Knockout Tournament** tables, **Run It Twice**, pre-actions, daily profit leaderboard, and AI bots with distinct playstyles.
 
-### ♟️ 5. Classic Strategy & Board Games
+### 🎲 6. Ludo (Cờ Cá Ngựa)
+- 2–4 player classic board game with **2 rulesets** (`1 & 6` deploy or `6-only`), **Back-kick (Đá Hậu)**, safe tiles, bonus rolls, 3D-styled dice animations, and AI bots.
+
+### ♟️ 7. Classic Strategy & Board Games
 - **Gomoku / Caro**: 3×3 XO up to 50×50 grids with incremental DOM updates and AI bot.
 - **Chess (Cờ Vua)**: Full FIDE rules (castling, en passant, promotion, draws), chess clocks, and AI bot.
 - **Xiangqi (Cờ Tướng)**: 9×10 Chinese Chess with full piece rules, clocks, and Alpha-Beta AI bot.
@@ -69,12 +77,15 @@ Supports instant play without account registration, **16 dark/light themes**, **
 │
 ├── geoguessr.py               # GeoGuessr engine & verified Street View RPC service
 ├── flags_quiz.py              # Flags & Capitals quiz engine + smart text matcher
+├── zombie.py                  # Zombie Survival 15 Hz co-op shooter engine
 ├── bluff.py                   # Liar's Deck engine & revolver mechanics
-├── poker.py / poker_hand.py   # Texas Hold'em engine & 7-card evaluator
+├── poker.py / poker_hand.py   # Texas Hold'em engine, 7-card evaluator & leaderboard
+├── ludo.py                    # Ludo (Cờ Cá Ngựa) engine
 ├── chessgame.py / xiangqi.py  # Chess & Xiangqi rules engines
 ├── caro.py / battleship.py    # Caro & Battleship engines
 ├── bot_*.py / bots.py         # Non-blocking AI bot engines & registry
 ├── chat.py / avatar.py        # Chat history, file/image uploads & avatar store
+├── hf_sync.py                 # Optional Hugging Face Dataset persistence sync
 │
 ├── assets/
 │   ├── countries_quiz.json    # 197 countries & capitals bilingual dataset
@@ -114,7 +125,7 @@ Open [http://127.0.0.1:8780](http://127.0.0.1:8780) in your browser.
 
 ```bash
 # Python unit tests
-python -m unittest discover -s tests -p "test_*.py"
+pytest -q
 
 # Python & JavaScript syntax checks
 python -m py_compile *.py
