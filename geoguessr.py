@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 import random
+import re
 import threading
 import time
 import urllib.request
@@ -1037,6 +1038,46 @@ def probe_google_streetview(lat: float, lng: float, radius: int = 50000, timeout
         return None
 
 
+SV_FEED_TARGET = 16
+SV_FEED_MAX_ITEMS = 12
+_SV_CACHE_MAX = 40
+_PANO_RE = re.compile(r"^[A-Za-z0-9_-]{22}$")
+_CTRL_RE = re.compile(r"[\x00-\x1f\x7f]")
+_CC_RE = re.compile(r"^[A-Za-z]{2,3}$")
+
+
+def _build_dynamic_loc(mode: str, res: dict, default_cc: str = "") -> dict | None:
+    """Chuẩn hóa 1 điểm Street View động (dùng chung cho cả server fetch và trình duyệt nạp hộ)."""
+    raw_cc = (res.get("country_code") or "").strip().upper()
+    # Quần đảo Hawaii trong bản đồ Châu Đại Dương trả mã US -> gắn mã HI để phân tách với lục địa Mỹ
+    if default_cc == "HI" and raw_cc in ("", "US"):
+        raw_cc = "HI"
+    elif not raw_cc and default_cc:
+        raw_cc = default_cc
+    if not is_valid_country_for_mode(mode, raw_cc, res.get("address", "")):
+        return None
+    s_lat, s_lng = res["lat"], res["lng"]
+    cc = raw_cc.lower()
+    region = ""
+    if mode != "vietnam" and cc:
+        region = REGION_ALIASES.get(cc, cc.upper())
+    if not region:
+        region = infer_region_from_coords(s_lat, s_lng, mode)
+    base_loc = {
+        "lat": s_lat,
+        "lng": s_lng,
+        "heading": res.get("heading") or random.randint(0, 359),
+        "pano": res["pano"],
+        "name": res.get("address", ""),
+        "country": region,
+        "cc": raw_cc,
+        "hint": "Google Street View 360° thời gian thực",
+        "dynamic": True,
+        "difficulty": "global",
+    }
+    return enrich_location_metadata(base_loc, mode)
+
+
 def fetch_random_streetview(
     mode: str = "world",
     attempts: int = 6,
@@ -1056,35 +1097,130 @@ def fetch_random_streetview(
         lng = random.uniform(lng_min, lng_max)
         res = probe_google_streetview(lat, lng, radius=search_radius, timeout=timeout)
         if res:
-            raw_cc = (res.get("country_code") or "").strip().upper()
-            # Quần đảo Hawaii trong bản đồ Châu Đại Dương trả mã US -> gắn mã HI để phân tách với lục địa Mỹ
-            if default_cc == "HI" and raw_cc in ("", "US"):
-                raw_cc = "HI"
-            elif not raw_cc and default_cc:
-                raw_cc = default_cc
-            if not is_valid_country_for_mode(mode, raw_cc, res.get("address", "")):
-                continue
-            s_lat, s_lng = res["lat"], res["lng"]
-            cc = raw_cc.lower()
-            region = ""
-            if mode != "vietnam" and cc:
-                region = REGION_ALIASES.get(cc, cc.upper())
-            if not region:
-                region = infer_region_from_coords(s_lat, s_lng, mode)
-            base_loc = {
-                "lat": s_lat,
-                "lng": s_lng,
-                "heading": res["heading"] or random.randint(0, 359),
-                "pano": res["pano"],
-                "name": res["address"],
-                "country": region,
-                "cc": raw_cc,
-                "hint": "Google Street View 360° thời gian thực",
-                "dynamic": True,
-                "difficulty": "global",
-            }
-            return enrich_location_metadata(base_loc, mode)
+            built = _build_dynamic_loc(mode, res, default_cc=default_cc)
+            if built is not None:
+                return built
     return None
+
+
+def sv_feed_need(mode: str) -> int:
+    """Số điểm Street View động còn thiếu trong bộ đệm, tối đa SV_FEED_MAX_ITEMS."""
+    if mode not in _ALL_GEO_MODES:
+        mode = "world"
+    with _DYNAMIC_SV_LOCK:
+        cur = len(_DYNAMIC_SV_CACHE.get(mode, []))
+    return min(SV_FEED_MAX_ITEMS, max(0, SV_FEED_TARGET - cur))
+
+
+def _sanitize_client_sv(raw: object) -> dict | None:
+    """Kiểm tra chặt chẽ từng trường do client gửi lên — không tin dữ liệu thô từ trình duyệt."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        lat = float(raw.get("lat"))
+        lng = float(raw.get("lng"))
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(lat) and math.isfinite(lng)):
+        return None
+    if not (-85.0 <= lat <= 85.0 and -180.0 <= lng <= 180.0):
+        return None
+    pano = raw.get("pano")
+    if not isinstance(pano, str) or not _PANO_RE.fullmatch(pano) or pano.startswith("CAoS"):
+        return None
+    try:
+        h_raw = float(raw.get("heading", 0))
+        heading = int(round(h_raw)) % 360 if math.isfinite(h_raw) else 0
+    except (TypeError, ValueError):
+        heading = 0
+    cc_raw = raw.get("country_code", "")
+    country_code = ""
+    if isinstance(cc_raw, str):
+        cc_clean = cc_raw.strip().upper()
+        if _CC_RE.fullmatch(cc_clean):
+            country_code = cc_clean
+    addr_raw = raw.get("address", "")
+    address = _CTRL_RE.sub("", addr_raw).strip()[:200] if isinstance(addr_raw, str) else ""
+    return {
+        "lat": round(lat, 5),
+        "lng": round(lng, 5),
+        "heading": heading,
+        "pano": pano,
+        "address": address,
+        "country_code": country_code,
+    }
+
+
+def _default_cc_for_point(mode: str, lat: float, lng: float) -> str:
+    """Tìm mã nước mặc định từ STREETVIEW_BOX_META cho khung chứa tọa độ (lat, lng)."""
+    boxes = STREETVIEW_LAND_BOXES.get(mode) or STREETVIEW_LAND_BOXES["world"]
+    for box in boxes:
+        lat_min, lat_max, lng_min, lng_max = box
+        if lat_min <= lat <= lat_max and lng_min <= lng <= lng_max:
+            meta = STREETVIEW_BOX_META.get(box)
+            if meta and meta[0]:
+                return meta[0]
+    for box, meta in STREETVIEW_BOX_META.items():
+        lat_min, lat_max, lng_min, lng_max = box
+        if lat_min <= lat <= lat_max and lng_min <= lng <= lng_max and meta[0]:
+            return meta[0]
+    return ""
+
+
+def ingest_client_streetview(mode: str, items: object, feeder_uid: str = "") -> int:
+    """Kiểm tra, lọc trùng và nạp tối đa SV_FEED_MAX_ITEMS điểm trình duyệt gửi về vào _DYNAMIC_SV_CACHE."""
+    if mode not in _ALL_GEO_MODES or not isinstance(items, list):
+        return 0
+    added = 0
+    with _DYNAMIC_SV_LOCK:
+        cache = _DYNAMIC_SV_CACHE.setdefault(mode, [])
+        existing_panos = {x.get("pano") for x in cache if x.get("pano")}
+        existing_coords = {(x["lat"], x["lng"]) for x in cache}
+        for raw in items[:SV_FEED_MAX_ITEMS]:
+            if len(cache) >= _SV_CACHE_MAX:
+                break
+            clean = _sanitize_client_sv(raw)
+            if clean is None:
+                continue
+            key = (clean["lat"], clean["lng"])
+            if clean["pano"] in existing_panos or key in existing_coords:
+                continue
+            default_cc = _default_cc_for_point(mode, clean["lat"], clean["lng"])
+            built = _build_dynamic_loc(mode, clean, default_cc=default_cc)
+            if built is None:
+                continue
+            built["source"] = "browser"
+            if feeder_uid:
+                built["feeder"] = feeder_uid
+            cache.append(built)
+            existing_panos.add(built["pano"])
+            existing_coords.add(key)
+            added += 1
+        if added > 0 and len(cache) > 1:
+            random.shuffle(cache)
+    return added
+
+
+def sv_client_config() -> dict:
+    """Trả cấu hình khung tìm Street View cho trình duyệt khi server bị chặn outbound Google."""
+    modes_out: dict[str, dict] = {}
+    for m in _ALL_GEO_MODES:
+        boxes = STREETVIEW_LAND_BOXES.get(m) or STREETVIEW_LAND_BOXES["world"]
+        default_radius = 18000 if m == "vietnam" else 45000
+        box_rows: list[list] = []
+        for b in boxes:
+            meta = STREETVIEW_BOX_META.get(b)
+            cc = meta[0] if meta else ""
+            radius = meta[1] if meta else default_radius
+            if m == "oceania":
+                weight = meta[2] if meta else 1.0
+            elif m == "world":
+                weight = 0.2 if cc in _MICRO_ISLAND_CCS else 1.0
+            else:
+                weight = 1.0
+            box_rows.append([b[0], b[1], b[2], b[3], int(radius), float(weight)])
+        modes_out[m] = {"boxes": box_rows}
+    return {"rpcUrl": _SV_RPC_URL, "modes": modes_out}
 
 
 def warm_dynamic_sv_cache(mode: str, target_count: int = 16) -> None:
@@ -1172,9 +1308,32 @@ class GeoRoom(SeatedRoom):
         self.session_seen_coords: set[tuple[float, float]] = set()
         self.session_recent_regions: list[str] = []
         self.loading_round: bool = False
+        self._last_sv_feed: float = 0.0
         self.reset_match()
         # Nạp sẵn bộ đệm Street View ngay khi tạo phòng để bấm Bắt đầu vào 0ms
         warm_dynamic_sv_cache(self.mode, target_count=16)
+
+    def _sv_feeder_uid(self) -> str:
+        """Người chơi thật đầu tiên còn kết nối trong phòng được giao nhiệm vụ nạp hộ Street View."""
+        for m in self.SEATS:
+            p = self.seat(m)
+            if p is not None and not p.bot and p.connected:
+                return p.uid
+        for p in self.players.values():
+            if not p.bot and p.connected:
+                return p.uid
+        return ""
+
+    def _sv_feed_request(self, uid: str) -> dict | None:
+        """Chỉ yêu cầu trình duyệt nạp hộ khi chế độ global, circuit mở, đúng feeder và bộ đệm còn thiếu."""
+        if not self._is_global_dynamic() or not is_sv_circuit_open():
+            return None
+        if not uid or uid != self._sv_feeder_uid():
+            return None
+        need = sv_feed_need(self.mode)
+        if need <= 0:
+            return None
+        return {"mode": self.mode, "need": need}
 
     def _seat_label(self, mark: str) -> str:
         return f"Ghế {mark}"
@@ -1438,19 +1597,29 @@ class GeoRoom(SeatedRoom):
         if self._is_global_dynamic():
             picked: dict | None = None
             recent_micro = {r for r in self.session_recent_regions[-3:] if r in _MICRO_ISLAND_CCS}
+            room_humans = {p.uid for p in self.players.values() if not p.bot and p.mark}
             with _DYNAMIC_SV_LOCK:
                 cache = _DYNAMIC_SV_CACHE.get(self.mode, [])
+                own_feeder_idx: int | None = None
                 fallback_idx: int | None = None
                 for i, cand in enumerate(cache):
                     key = (cand["lat"], cand["lng"])
                     if key in used_coords or key in self.session_seen_coords:
                         continue
                     cc = str(cand.get("cc") or "").upper()
-                    if cc in recent_micro and fallback_idx is None:
-                        fallback_idx = i
+                    if cc in recent_micro:
+                        if fallback_idx is None:
+                            fallback_idx = i
+                        continue
+                    feeder = cand.get("feeder", "")
+                    if feeder and feeder in room_humans:
+                        if own_feeder_idx is None:
+                            own_feeder_idx = i
                         continue
                     picked = {**cache.pop(i), "difficulty": "global"}
                     break
+                if picked is None and own_feeder_idx is not None:
+                    picked = {**cache.pop(own_feeder_idx), "difficulty": "global"}
                 if picked is None and fallback_idx is not None:
                     picked = {**cache.pop(fallback_idx), "difficulty": "global"}
             warm_dynamic_sv_cache(self.mode, target_count=12)
@@ -1507,18 +1676,23 @@ class GeoRoom(SeatedRoom):
         used: set[tuple[float, float]] = set()
 
         # Chế độ Toàn Cầu (global): 100% lấy từ Google Street View thực tế.
-        # Lấy từ bộ đệm RAM đã nạp sẵn (0ms); nếu còn thiếu cho 5 vòng đầu, nạp song song trực tiếp.
+        # Lấy tối đa initial_need từ bộ đệm RAM theo index (không vứt điểm phòng này đã xem
+        # khỏi cache chung); các vòng sau của duel/streak sẽ bốc cuốn chiếu ở _begin_round.
         if self._is_global_dynamic():
             initial_need = min(target_len, ROUNDS_PER_MATCH)
             with _DYNAMIC_SV_LOCK:
                 cache = _DYNAMIC_SV_CACHE.get(self.mode, [])
-                while cache and len(deck) < target_len:
-                    cand = cache.pop(0)
+                idx = 0
+                while idx < len(cache) and len(deck) < initial_need:
+                    cand = cache[idx]
                     key = (cand["lat"], cand["lng"])
-                    if key not in used and key not in self.session_seen_coords:
-                        deck.append({**cand, "difficulty": "global"})
-                        used.add(key)
-                        self.session_seen_coords.add(key)
+                    if key in used or key in self.session_seen_coords:
+                        idx += 1
+                        continue
+                    cache.pop(idx)
+                    deck.append({**cand, "difficulty": "global"})
+                    used.add(key)
+                    self.session_seen_coords.add(key)
 
             missing = initial_need - len(deck)
             if missing > 0 and allow_live_fetch and not is_sv_circuit_open():
@@ -1537,8 +1711,14 @@ class GeoRoom(SeatedRoom):
                                 self.session_seen_coords.add(key)
             warm_dynamic_sv_cache(self.mode, target_count=12)
 
-        # Chỉ dùng pool tĩnh cho chế độ Landmark, hoặc khi mạng không kết nối được Google
-        need = target_len if not self._is_global_dynamic() else min(target_len, ROUNDS_PER_MATCH)
+        # Chỉ dùng pool tĩnh cho chế độ Landmark, hoặc khi mạng không kết nối được Google.
+        # Khi chế độ global bị circuit mở, chỉ bốc trước 1 vòng tĩnh để vòng 2+ lấy từ bộ đệm trình duyệt nạp.
+        if not self._is_global_dynamic():
+            need = target_len
+        elif is_sv_circuit_open():
+            need = 1
+        else:
+            need = min(target_len, ROUNDS_PER_MATCH)
         if len(deck) < need:
             pool = self._pool_for_config()
             fresh = [x for x in pool if (x["lat"], x["lng"]) not in self.session_seen_coords]
@@ -2084,6 +2264,21 @@ class GeoRoom(SeatedRoom):
         self.touched = time.time()
 
     def handle(self, uid: str, action: str, msg: dict, allow_live_fetch: bool = True) -> None:
+        if action == "sv_feed":
+            # Chỉ nhận nạp hộ khi circuit breaker mở, từ đúng người nạp hộ, đúng mode, tối đa 1 lần/giây.
+            if not self._is_global_dynamic() or not is_sv_circuit_open():
+                return
+            if uid != self._sv_feeder_uid():
+                return
+            now = time.monotonic()
+            if now - self._last_sv_feed < 1.0:
+                return
+            if str(msg.get("mode", "")).strip() != self.mode:
+                return
+            self._last_sv_feed = now
+            ingest_client_streetview(self.mode, msg.get("items") or [], feeder_uid=uid)
+            return
+
         player = self.players.get(uid)
         if player is None or not player.mark:
             raise GameError("Bạn cần ngồi vào ghế để thao tác.")
@@ -2272,13 +2467,20 @@ class GeoRoom(SeatedRoom):
             "totalRounds": self.total_rounds,
             "serverNow": time.time(),
             "deadline": self.deadline,
-            "image": target.get("image", "") if target else "",
-            "streetView": {
-                "lat": target["lat"],
-                "lng": target["lng"],
-                "heading": target.get("heading", 0),
-                "pano": target.get("pano", ""),
-            } if target else None,
+            "streetView": (
+                {
+                    "heading": target.get("heading", 0),
+                    "pano": target.get("pano", ""),
+                    **(
+                        {"lat": target["lat"], "lng": target["lng"]}
+                        if (reveal_target or not target.get("pano"))
+                        else {}
+                    ),
+                }
+                if target
+                else None
+            ),
+            "svFeed": self._sv_feed_request(uid),
             "guessedMarks": sorted(self.guesses.keys()),
             "myDraft": {"lat": my_draft["lat"], "lng": my_draft["lng"]} if my_draft else None,
             "myGuess": {"lat": my_guess["lat"], "lng": my_guess["lng"]} if my_guess else None,
