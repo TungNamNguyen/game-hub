@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import time
 
-from games import GameError, SeatedRoom, other_mark
+from games import GameError, SeatedRoom, int_field, other_mark
 
 COLS, ROWS = 9, 10
 CELLS = COLS * ROWS
@@ -439,7 +439,7 @@ class XiangqiRoom(SeatedRoom):
     # ---- hành động --------------------------------------------------------- #
     def handle(self, uid: str, action: str, msg: dict) -> None:
         if action == "move":
-            self.move(uid, int(msg.get("from", -1)), int(msg.get("to", -1)))
+            self.move(uid, int_field(msg, "from", -1), int_field(msg, "to", -1))
         elif action == "draw":
             self.offer_draw(uid)
         elif action == "draw-accept":
@@ -489,6 +489,7 @@ class XiangqiRoom(SeatedRoom):
             "captured": {"X": list(self.captured["X"]), "O": list(self.captured["O"])},
             "moves_len": len(self.moves),
             "seen": dict(self.seen),
+            "clock_remain": dict(self.clock_remain),
         })
 
         after, captured = apply_move(self.board, frm, to)
@@ -576,6 +577,8 @@ class XiangqiRoom(SeatedRoom):
 
     # ---- xin đi lại (Undo) ------------------------------------------------- #
     def _apply_undo_plies(self, plies: int) -> None:
+        if self.clock_initial > 0:
+            self._spend_clock(self.turn)
         snap = None
         for _ in range(plies):
             if self._undo_stack:
@@ -592,6 +595,11 @@ class XiangqiRoom(SeatedRoom):
         self.draw_offer = ""
         self.undo_offer = ""
         if self.clock_initial > 0:
+            saved_clk = snap.get("clock_remain")
+            if isinstance(saved_clk, dict):
+                for m in self.SEATS:
+                    if m in saved_clk:
+                        self.clock_remain[m] = min(self.clock_remain.get(m, saved_clk[m]), saved_clk[m])
             self.turn_started_at = time.time()
         self._refresh()
 
