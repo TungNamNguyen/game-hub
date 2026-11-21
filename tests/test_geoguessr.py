@@ -147,7 +147,7 @@ def test_healthz_get_head_and_create_room_with_difficulty():
     st_head, _ = asyncio.run(call_asgi("HEAD", "/healthz"))
     assert st_head == 200
 
-    res = api_create_room(CreateRoom(channel="geo", mode="europe", config={"difficulty": "landmark"}))
+    res = asyncio.run(api_create_room(CreateRoom(channel="geo", mode="europe", config={"difficulty": "landmark"})))
     code = res["code"]
     created = hub.managers["geo"].get(code)
     assert created is not None
@@ -276,7 +276,7 @@ def test_geo_bot_registered_and_works_in_all_modes():
     assert len(room.bot_players()) == 1
 
 
-def test_hub_geo_prefetch_offloads_to_thread_and_guards_loading_round():
+def test_hub_geo_prefetch_offloads_to_thread_and_guards_loading_round(tmp_path):
     class DummySock:
         def __init__(self):
             self.sent = []
@@ -285,7 +285,7 @@ def test_hub_geo_prefetch_offloads_to_thread_and_guards_loading_round():
             self.sent.append(payload)
 
     async def scenario():
-        test_hub = Hub(Path(__file__).resolve().parent.parent / "data")
+        test_hub = Hub(tmp_path)
         room = test_hub.managers["geo"].create("world", config={"difficulty": "global", "rounds": 5})
         sock = DummySock()
         session = await test_hub.register(sock, "u_async_geo", "Tester")
